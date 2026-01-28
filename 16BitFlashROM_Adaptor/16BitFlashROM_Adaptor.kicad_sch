@@ -6105,7 +6105,7 @@
 				(hide yes)
 			)
 		)
-		(property "Value" "Right GPIO"
+		(property "Value" "Right Pins"
 			(at 273.291 94.1207 90)
 			(effects
 				(font
@@ -7110,7 +7110,7 @@
 				(hide yes)
 			)
 		)
-		(property "Value" "Right GPIO"
+		(property "Value" "Left Pins"
 			(at 21.349 91.2993 90)
 			(effects
 				(font
@@ -7584,7 +7584,7 @@
 				(hide yes)
 			)
 		)
-		(property "Value" "~"
+		(property "Value" "Address"
 			(at 106.8207 28.969 90)
 			(effects
 				(font
@@ -7684,7 +7684,7 @@
 				(hide yes)
 			)
 		)
-		(property "Value" "~"
+		(property "Value" "Reset"
 			(at 81.1393 28.969 90)
 			(effects
 				(font
