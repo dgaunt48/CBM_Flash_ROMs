@@ -8,6 +8,8 @@
 #include "types.h"
 #include "pico/stdlib.h"
 
+// See FatFs - Generic FAT Filesystem Module, "Application Interface",
+// http://elm-chan.org/fsw/ff/00index_e.html
 #include "f_util.h"
 #include "ff.h"
 #include "hw_config.h"
@@ -34,6 +36,8 @@ enum rgbColours {RGB_BLACK, RGB_RED, RGB_GREEN, RGB_YELLOW, RGB_BLUE, RGB_MAGENT
 
 u8 aVGAScreenBuffer[(VGA_RESOLUTION_X * VGA_RESOLUTION_Y) >> 1];
 u8* address_pointer = aVGAScreenBuffer;
+
+static volatile u8 s_aReadBuffer[1024];
 
 //-----------------------------------------------------------------------------------------------'-
 //----                                                                                        ----
@@ -264,42 +268,191 @@ int main()
 {
     stdio_init_all();
 
+	// Data Bus Off
+	gpio_init(PIN_DATA_OE);
+    gpio_set_dir(PIN_DATA_OE, GPIO_OUT);
+	gpio_put(PIN_DATA_OE, false);
+
+	// Address Latch Transparent
+	gpio_init(PIN_LATCH_ADDRESS);
+    gpio_set_dir(PIN_LATCH_ADDRESS, GPIO_OUT);
+	gpio_put(PIN_LATCH_ADDRESS, true);
+
+	// Address Output On
+	gpio_init(PIN_LATCH_OE);
+    gpio_set_dir(PIN_LATCH_OE, GPIO_OUT);
+	gpio_put(PIN_LATCH_OE, false);
+
+	// Word Mode (Only For 16 Bit Flash IC"s)
+	gpio_init(PIN_BYTE);
+    gpio_set_dir(PIN_BYTE, GPIO_OUT);
+	gpio_put(PIN_BYTE, true);
+
+	// Write Is Disabled
+	gpio_init(PIN_WE);
+    gpio_set_dir(PIN_WE, GPIO_OUT);
+	gpio_put(PIN_WE, true);
+
+	// Flash IC Output Is Enabled
+	gpio_init(PIN_OE);
+    gpio_set_dir(PIN_OE, GPIO_OUT);
+	gpio_put(PIN_OE, false);
+
+	// Flash IC Is Enabled (Only For 16 Bit IC Socket)
+	gpio_init(PIN_CE);
+    gpio_set_dir(PIN_CE, GPIO_OUT);
+	gpio_put(PIN_CE, false);
+
+	// Set All IO Lines To Output
+	for(u32 i=0; i<ADDRESS_BUS_SIZE; ++i)
+	{
+	    gpio_init(PIN_IO0 + i);
+	    gpio_set_dir(PIN_IO0 + i, GPIO_OUT);
+		gpio_put(PIN_IO0 + i, 0);
+	}
+
     initVGA();
 	FilledRectangle(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB_GREEN);
 	FilledRectangle(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB_BLACK);
 
-    // See FatFs - Generic FAT Filesystem Module, "Application Interface",
-    // http://elm-chan.org/fsw/ff/00index_e.html
-    sd_card_t *pSD = sd_get_by_num(0);
-    FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
+	char szTempString[128];
+	sd_card_t *pSD = sd_get_by_num(0);
 
-    if (FR_OK != fr)
-        panic("f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
+	FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
+	if (FR_OK == fr)
+	{
+		FIL fil;
+		const char* const filename = "VicTestRom.bin";
 
-    FIL fil;
-    const char* const filename = "filename.txt";
-    fr = f_open(&fil, filename, FA_OPEN_APPEND | FA_WRITE);
+		fr = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
+		if (FR_OK == fr)
+		{
+			const u32 uRomSize = f_size(&fil);
+			u32 uRomOffset = 0;
+			u32 uBytesRead;
+			bool bVerifySuccess = true;
 
-    if (FR_OK != fr && FR_EXIST != fr)
-        panic("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
+			while(bVerifySuccess)
+			{
+				f_read(&fil, (void*)&s_aReadBuffer, 1024, &uBytesRead);
+				
+				if(uBytesRead > 0)
+				{
+					for(u32 i=0; i<uBytesRead; ++i)
+					{
+						// Diable Data Bus And Set Address
+						gpio_put(PIN_DATA_OE, false);
+						gpio_set_dir_out_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0);
+						gpio_put(PIN_LATCH_ADDRESS, true);
+						gpio_put_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0, (uRomOffset + i) << PIN_IO0);
 
-    if (f_printf(&fil, "Dave Waz Ere Again!!!\n") < 0)
-        printf("f_printf failed\n");
+						// Latch Address Lines
+						delay_120ns();
+						gpio_put(PIN_LATCH_ADDRESS, false);
 
-    fr = f_close(&fil);
+						// Enable And Read The Data Bus
+						gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
+						gpio_put(PIN_DATA_OE, true);
+						delay_120ns();
+						delay_120ns();
+						delay_120ns();
 
-    if (FR_OK != fr)
-        printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
+						const u8 uDataBus = (gpio_get_all() >> PIN_IO0) & 0xFF;
+						if (s_aReadBuffer[i] != uDataBus)
+						{
+							bVerifySuccess = false;
+							break;
+						}
+					}
 
-    f_unmount(pSD->pcName);
+					uRomOffset += uBytesRead;
+				}
+				else
+				{
+					break;
+				}
+			}
+
+			if (bVerifySuccess)
+			{
+				DrawString(2, 2, "ROM Verify Success!!!", RGB_GREEN);
+			}
+			else
+			{
+				DrawString(2, 2, "ROM Verify Failed!!!", RGB_RED);
+			}
+
+			f_close(&fil);
+		}
+		else
+		{
+			sprintf(szTempString, "can't open file: %s", filename);
+		}
+
+	    f_unmount(pSD->pcName);
+	}
+	else
+	{
+		sprintf(szTempString, "f_mount error: %s (%d)", FRESULT_str(fr), fr);
+		DrawString(2, 2, szTempString, RGB_RED);
+	}
+
+    // FIL fil;
+    // const char* const filename = "filename.txt";
+    // fr = f_open(&fil, filename, FA_OPEN_APPEND | FA_WRITE);
+
+    // if (FR_OK != fr && FR_EXIST != fr)
+    //     panic("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
+
+    // if (f_printf(&fil, "Dave Waz Ere Again!!!\n") < 0)
+    //     printf("f_printf failed\n");
+
+    // fr = f_close(&fil);
+
+    // if (FR_OK != fr)
+    //     printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
 
 	u32 uOnTime = 0;
-	char szTempString[128];
+	const u32 uFlashOffset = 0;
+
+	for (uint32_t uLine=0; uLine<40; ++uLine)
+	{
+		u8 aLineBuffer[16];
+		const u32 uAddress = uFlashOffset + (uLine << 4);
+
+		for (u32 i=0; i<16; ++i)
+		{
+			// Diable Data Bus And Set Address
+			gpio_put(PIN_DATA_OE, false);
+			gpio_set_dir_out_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0);
+			gpio_put(PIN_LATCH_ADDRESS, true);
+			gpio_put_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0, (uAddress + i) << PIN_IO0);
+
+			// Latch Address Lines
+			delay_120ns();
+			gpio_put(PIN_LATCH_ADDRESS, false);
+
+			// Enable And Read The Data Bus
+			gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
+			gpio_put(PIN_DATA_OE, true);
+			delay_120ns();
+			delay_120ns();
+			delay_120ns();
+
+			aLineBuffer[i] = (gpio_get_all() >> PIN_IO0) & 0xFF;
+
+			// if (Vic8kCombo[uAddress + i] != aLineBuffer[i])
+			// 	aLineBuffer[i] = '*';
+		}
+
+//		SpiNorFlash_Read(uAddress, 16, aLineBuffer);
+		FormatHexDumpLine(3, 10 + uLine, uAddress, aLineBuffer, RGB_CYAN);
+	}
 
 	while(true)
 	{
 		sprintf(szTempString, "Time On = %d.%d", uOnTime / 50, (uOnTime % 50) * 2);
-		DrawString(2, 2, szTempString, RGB_YELLOW);
+		DrawString(2, 62, szTempString, RGB_YELLOW);
 		sleep_ms(16);
 		uOnTime++;
 	}
