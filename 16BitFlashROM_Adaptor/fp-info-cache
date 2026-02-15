@@ -1,4 +1,4 @@
-26912141380972848
+26913932114382258
 Audio_Module
 Reverb_BTDR-1H
 Digital Reverberation Unit, http://www.belton.co.kr/inc/downfile.php?seq=17&file=pdf (footprint from http://www.uk-electronic.de/PDF/BTDR-1.pdf)
@@ -58421,6 +58421,13 @@ Through hole pin header THT 2x08 2.54mm double row
 0
 24
 24
+Dave Footprints
+PinHeader_Amiga_ROM
+Through hole straight pin header, 2x03, 2.54mm pitch, double rows
+Through hole pin header THT 2x03 2.54mm double row
+0
+5
+5
 Dave Footprints
 PinHeader_Vic20_Cartridge
 c64 Cartridge Programmer Pin Header

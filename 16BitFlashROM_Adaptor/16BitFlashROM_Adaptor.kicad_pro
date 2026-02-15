@@ -506,12 +506,11 @@
         "bus_width": 8,
         "clearance": 0.2,
         "diff_pair_gap": 0.25,
-        "diff_pair_via_gap": 0.25,
         "diff_pair_width": 0.2,
         "line_style": 0,
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
-        "name": "3V3IO",
+        "name": "Address",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 0,
         "schematic_color": "rgb(35, 223, 255)",
@@ -521,10 +520,26 @@
         "wire_width": 8
       },
       {
+        "bus_width": 8,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "Data",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 2,
+        "schematic_color": "rgb(255, 0, 255)",
+        "track_width": 0.2,
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 8
+      },
+      {
         "bus_width": 12,
         "clearance": 0.2,
         "diff_pair_gap": 0.25,
-        "diff_pair_via_gap": 0.25,
         "diff_pair_width": 0.2,
         "line_style": 0,
         "microvia_diameter": 0.3,
@@ -539,94 +554,21 @@
         "wire_width": 20
       },
       {
-        "bus_width": 8,
-        "clearance": 0.2,
-        "diff_pair_gap": 0.25,
-        "diff_pair_via_gap": 0.25,
-        "diff_pair_width": 0.2,
-        "line_style": 0,
-        "microvia_diameter": 0.3,
-        "microvia_drill": 0.1,
-        "name": "GPIO",
-        "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "priority": 2,
-        "schematic_color": "rgb(243, 41, 255)",
-        "track_width": 0.2,
-        "via_diameter": 0.6,
-        "via_drill": 0.3,
-        "wire_width": 8
-      },
-      {
-        "bus_width": 20,
-        "clearance": 0.2,
-        "diff_pair_gap": 0.25,
-        "diff_pair_via_gap": 0.25,
-        "diff_pair_width": 0.2,
-        "line_style": 0,
-        "microvia_diameter": 0.3,
-        "microvia_drill": 0.1,
-        "name": "Power 1v1",
-        "pcb_color": "rgb(230, 230, 105)",
-        "priority": 3,
-        "schematic_color": "rgb(230, 230, 105)",
-        "track_width": 0.5,
-        "via_diameter": 0.6,
-        "via_drill": 0.3,
-        "wire_width": 20
-      },
-      {
         "bus_width": 12,
         "clearance": 0.2,
         "diff_pair_gap": 0.25,
-        "diff_pair_via_gap": 0.25,
-        "diff_pair_width": 0.2,
-        "line_style": 0,
-        "microvia_diameter": 0.3,
-        "microvia_drill": 0.1,
-        "name": "Power 3v3",
-        "pcb_color": "rgb(255, 165, 0)",
-        "priority": 4,
-        "schematic_color": "rgb(255, 165, 0)",
-        "track_width": 0.5,
-        "via_diameter": 0.6,
-        "via_drill": 0.3,
-        "wire_width": 20
-      },
-      {
-        "bus_width": 12,
-        "clearance": 0.2,
-        "diff_pair_gap": 0.25,
-        "diff_pair_via_gap": 0.25,
         "diff_pair_width": 0.2,
         "line_style": 0,
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
         "name": "Power 5v0",
         "pcb_color": "rgb(255, 0, 0)",
-        "priority": 5,
+        "priority": 3,
         "schematic_color": "rgb(255, 0, 0)",
         "track_width": 0.5,
         "via_diameter": 0.6,
         "via_drill": 0.3,
         "wire_width": 20
-      },
-      {
-        "bus_width": 8,
-        "clearance": 0.2,
-        "diff_pair_gap": 0.25,
-        "diff_pair_via_gap": 0.25,
-        "diff_pair_width": 0.2,
-        "line_style": 0,
-        "microvia_diameter": 0.3,
-        "microvia_drill": 0.1,
-        "name": "SPI",
-        "pcb_color": "rgb(255, 160, 188)",
-        "priority": 6,
-        "schematic_color": "rgb(255, 160, 188)",
-        "track_width": 0.2,
-        "via_diameter": 0.6,
-        "via_drill": 0.3,
-        "wire_width": 8
       }
     ],
     "meta": {
@@ -637,63 +579,19 @@
     "netclass_patterns": [
       {
         "netclass": "Power 5v0",
-        "pattern": "+5V"
-      },
-      {
-        "netclass": "Power 3v3",
-        "pattern": "+3V3"
-      },
-      {
-        "netclass": "Power 1v1",
-        "pattern": "/2350_1V1"
+        "pattern": "VCC"
       },
       {
         "netclass": "GND",
         "pattern": "GND"
       },
       {
-        "netclass": "SPI",
-        "pattern": "/2350_QSPI.*"
+        "netclass": "Address",
+        "pattern": "/A*"
       },
       {
-        "netclass": "3V3IO",
-        "pattern": "/3v3_L*"
-      },
-      {
-        "netclass": "3V3IO",
-        "pattern": "/3v3_R*"
-      },
-      {
-        "netclass": "SPI",
-        "pattern": "/SPI0.TX"
-      },
-      {
-        "netclass": "SPI",
-        "pattern": "/SPI0.RX"
-      },
-      {
-        "netclass": "SPI",
-        "pattern": "/SPI0.~{CS}"
-      },
-      {
-        "netclass": "SPI",
-        "pattern": "/SPI0.SCK"
-      },
-      {
-        "netclass": "SPI",
-        "pattern": "/2350_USB_D-"
-      },
-      {
-        "netclass": "SPI",
-        "pattern": "/2350_USB_D+"
-      },
-      {
-        "netclass": "GPIO",
-        "pattern": "/GPIO_L*"
-      },
-      {
-        "netclass": "GPIO",
-        "pattern": "/GPIO_R*"
+        "netclass": "Data",
+        "pattern": "/DQ*"
       }
     ]
   },
