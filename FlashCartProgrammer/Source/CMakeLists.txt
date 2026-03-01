@@ -35,7 +35,13 @@ pico_sdk_init()
 
 add_subdirectory(../FatFs_SPI build)
 # Add executable. Default name is the project name, version 0.1
-add_executable(FlashCartProgrammer FlashCartProgrammer.c hw_config.c VicChars.c)
+add_executable(
+    FlashCartProgrammer
+    FlashCartProgrammer.c
+    hw_config.c
+    vga111.c
+    VicChars.c
+    )
 
 # Generate PIO header
 pico_generate_pio_header(FlashCartProgrammer ${CMAKE_CURRENT_LIST_DIR}/hsync.pio)
@@ -47,7 +53,8 @@ pico_enable_stdio_uart(FlashCartProgrammer 0)
 pico_enable_stdio_usb(FlashCartProgrammer 0)
 
 # pull in common dependencies
-target_link_libraries(FlashCartProgrammer
+target_link_libraries(
+    FlashCartProgrammer
     hardware_spi
     hardware_dma
     hardware_pio
