@@ -20,7 +20,7 @@
 #include "VicChars.h"
 
 const u8 g_aHexTable[16] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
-volatile u8 aVGAScreenBuffer[(VGA_RESOLUTION_X * VGA_RESOLUTION_Y) >> 1];
+u8 volatile aVGAScreenBuffer[(VGA_RESOLUTION_X * VGA_RESOLUTION_Y) >> 1];
 volatile u8* address_pointer = aVGAScreenBuffer;
 
 //------------------------------------------------------------------------------------------------

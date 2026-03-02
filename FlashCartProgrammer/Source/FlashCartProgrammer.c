@@ -61,6 +61,26 @@ void FormatHexDumpLine(u32 uCharX, u32 uCharY, const u32 uAddress, const u8* pLi
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
+void flash_command_byte(const u32 uAddress, const u8 uData)
+{
+	gpio_put(PIN_DATA_OE, false);														// Disable Data Bus
+	gpio_put(PIN_LATCH_ADDRESS, true);													// Load Address Latch
+	gpio_put_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0, uAddress << PIN_IO0);		// Set Address On IO Lines
+	busy_wait_at_least_cycles(5);														// Wait Until Address Is Stable
+	gpio_put(PIN_LATCH_ADDRESS, false);													// Latch Address On Bus
+	gpio_put(PIN_FLASH_WE, false);														// Load Address To Flash On Falling Edge Of WE
+	gpio_put_masked(0xFF << PIN_IO0, (u32)uData << PIN_IO0);							// Set Data On IO Lines
+	gpio_put(PIN_DATA_OE, true);														// Assert OE High To Write
+	busy_wait_at_least_cycles(40);														// Wait Until Stable ... 30 Seems About Minimum ... So Add A Bit For Safety
+	gpio_put(PIN_FLASH_WE, true);														// Write Byte On Rising Edge Of WE
+}
+
+
+static volatile u8 s_uTest = 0;
+
+//------------------------------------------------------------------------------------------------
+//----                                                                                        ----
+//------------------------------------------------------------------------------------------------
 int main()
 {
     stdio_init_all();
@@ -113,6 +133,47 @@ int main()
 	FilledRectangle(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB_BLACK);
 
 	char szTempString[128];
+
+	gpio_put(PIN_FLASH_OE, true);
+	gpio_put(PIN_FLASH_WE, true);
+	gpio_set_dir_out_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0);
+
+
+//    SST39SF0_SoftwareIDEntry();
+	flash_command_byte(0x5555, 0xAA);
+	flash_command_byte(0x2AAA, 0x55);
+	flash_command_byte(0x5555, 0x90);
+    sleep_ms(16);                        // Give the IC time to exit standby mode.
+
+	// Set Address 0x0000
+	gpio_put(PIN_DATA_OE, false);
+	gpio_put(PIN_FLASH_OE, false);
+	gpio_put(PIN_LATCH_ADDRESS, true);
+	gpio_put_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0, 0x0000 << PIN_IO0);
+	busy_wait_at_least_cycles(5);
+	gpio_put(PIN_LATCH_ADDRESS, false);
+
+	gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
+	gpio_put(PIN_DATA_OE, true);
+
+	busy_wait_at_least_cycles(15);
+	s_uTest = (gpio_get_all() >> PIN_IO0) & 0xFF;
+
+	sprintf(szTempString, "Manufacturer Id = 0x%02x (BF)", s_uTest);
+	DrawString(2, 56, szTempString, RGB_GREEN);
+
+//	  SST39SF0_SoftwareIDExit();
+	gpio_put(PIN_FLASH_OE, true);
+	gpio_put(PIN_FLASH_WE, true);
+	gpio_set_dir_out_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0);
+
+	flash_command_byte(0x5555, 0xAA);
+	flash_command_byte(0x2AAA, 0x55);
+	flash_command_byte(0x5555, 0xF0);
+
+	gpio_put(PIN_FLASH_OE, false);
+
+
 	sd_card_t *pSD = sd_get_by_num(0);
 
 	FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
@@ -246,7 +307,7 @@ int main()
 	while(true)
 	{
 		sprintf(szTempString, "Time On = %d.%d", uOnTime / 50, (uOnTime % 50) * 2);
-		DrawString(2, 62, szTempString, RGB_YELLOW);
+		DrawString(2, 58, szTempString, RGB_YELLOW);
 		sleep_ms(16);
 		uOnTime++;
 	}
