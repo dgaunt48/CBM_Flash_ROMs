@@ -15,6 +15,19 @@
 #include "ff.h"
 #include "hw_config.h"
 
+#define SST39SF0_MANUFACTURER   (0xBF)    // flash manufacturer is SST
+#define SST39SF0_5V0            (0xB)
+#define SST39LF0_3V3            (0xD)
+//#define SST39SF0_SIZE_128K (0xB5)       /* 1024 Mb ... 128k x 8 */
+//#define SST39SF0_SIZE_256K (0xB6)       /* 2048 Mb ... 256k x 8 */
+//#define SST39SF0_SIZE_512K (0xB7)       /* 4096 Mb ... 512k x 8 */
+#define SST39SF0_PAGE_SHIFT (8)
+#define SST39SF0_SECTOR_SHIFT (12)
+#define SST39SF0_PAGE_SIZE (1 << SST39SF0_PAGE_SHIFT)
+#define SST39SF0_SECTOR_SIZE (1 << SST39SF0_SECTOR_SHIFT)
+#define SST39SF0_PAGES_PER_SECTOR (1 << (SST39SF0_SECTOR_SHIFT - SST39SF0_PAGE_SHIFT))
+#define SST39SF0_ERASED_VALUE (0xFF)
+
 enum vga_pins {
 	PIN_RED = 0,
 	PIN_GREEN,
@@ -59,24 +72,71 @@ void FormatHexDumpLine(u32 uCharX, u32 uCharY, const u32 uAddress, const u8* pLi
 }
 
 //------------------------------------------------------------------------------------------------
-//----                                                                                        ----
+//---- flash_latch_address                                                                    ----
 //------------------------------------------------------------------------------------------------
-void flash_command_byte(const u32 uAddress, const u8 uData)
+void flash_latch_address(const u32 uAddress)
 {
 	gpio_put(PIN_DATA_OE, false);														// Disable Data Bus
+	gpio_set_dir_out_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0);					// Set All IO Lines To Output
 	gpio_put(PIN_LATCH_ADDRESS, true);													// Load Address Latch
 	gpio_put_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0, uAddress << PIN_IO0);		// Set Address On IO Lines
 	busy_wait_at_least_cycles(5);														// Wait Until Address Is Stable
 	gpio_put(PIN_LATCH_ADDRESS, false);													// Latch Address On Bus
+}
+
+//------------------------------------------------------------------------------------------------
+//---- flash_read_byte                                                                        ----
+//------------------------------------------------------------------------------------------------
+u8 flash_read_byte(const u32 uAddress)
+{
+	flash_latch_address(uAddress);
+	gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
+	gpio_put(PIN_DATA_OE, true);
+	busy_wait_at_least_cycles(15);
+	return (gpio_get_all() >> PIN_IO0) & 0xFF;
+}
+
+//------------------------------------------------------------------------------------------------
+//---- flash_command_byte                                                                     ----
+//------------------------------------------------------------------------------------------------
+void flash_command_byte(const u32 uAddress, const u8 uData)
+{
+	flash_latch_address(uAddress);
 	gpio_put(PIN_FLASH_WE, false);														// Load Address To Flash On Falling Edge Of WE
+
 	gpio_put_masked(0xFF << PIN_IO0, (u32)uData << PIN_IO0);							// Set Data On IO Lines
 	gpio_put(PIN_DATA_OE, true);														// Assert OE High To Write
 	busy_wait_at_least_cycles(40);														// Wait Until Stable ... 30 Seems About Minimum ... So Add A Bit For Safety
 	gpio_put(PIN_FLASH_WE, true);														// Write Byte On Rising Edge Of WE
 }
 
+//------------------------------------------------------------------------------------------------
+//---- flash_command_mode_read                                                                ----
+//------------------------------------------------------------------------------------------------
+void flash_command_mode_read(void)
+{
+	gpio_put(PIN_FLASH_WE, true);
+	gpio_put(PIN_FLASH_OE, false);
+}
 
-static volatile u8 s_uTest = 0;
+//------------------------------------------------------------------------------------------------
+//---- flash_command_mode_write                                                               ----
+//------------------------------------------------------------------------------------------------
+void flash_command_mode_write(void)
+{
+	gpio_put(PIN_FLASH_OE, true);
+	gpio_put(PIN_FLASH_WE, true);
+}
+
+//------------------------------------------------------------------------------------------------
+//---- flash_command_sequence                                                                 ----
+//------------------------------------------------------------------------------------------------
+void flash_command_sequence(const u32 uAddress, const u8 uData)
+{
+	flash_command_byte(0x5555, 0xAA);
+	flash_command_byte(0x2AAA, 0x55);
+	flash_command_byte(uAddress, uData);
+}
 
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
@@ -134,44 +194,36 @@ int main()
 
 	char szTempString[128];
 
-	gpio_put(PIN_FLASH_OE, true);
-	gpio_put(PIN_FLASH_WE, true);
-	gpio_set_dir_out_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0);
-
 
 //    SST39SF0_SoftwareIDEntry();
-	flash_command_byte(0x5555, 0xAA);
-	flash_command_byte(0x2AAA, 0x55);
-	flash_command_byte(0x5555, 0x90);
+	flash_command_mode_write();
+	flash_command_sequence(0x5555, 0x90);
+	flash_command_mode_read();
     sleep_ms(16);                        // Give the IC time to exit standby mode.
 
-	// Set Address 0x0000
-	gpio_put(PIN_DATA_OE, false);
-	gpio_put(PIN_FLASH_OE, false);
-	gpio_put(PIN_LATCH_ADDRESS, true);
-	gpio_put_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0, 0x0000 << PIN_IO0);
-	busy_wait_at_least_cycles(5);
-	gpio_put(PIN_LATCH_ADDRESS, false);
+	const u8 uManufacturerID = flash_read_byte(0);
 
-	gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
-	gpio_put(PIN_DATA_OE, true);
+    if (SST39SF0_MANUFACTURER == uManufacturerID)
+    {
+        const u8 uFlashID = flash_read_byte(1);
+        const u8 uFlashSize = (uFlashID & 15);
+        const u8 uFlashType = (uFlashID >> 4);
 
-	busy_wait_at_least_cycles(15);
-	s_uTest = (gpio_get_all() >> PIN_IO0) & 0xFF;
+        if( (uFlashSize >= 4) && (uFlashSize <= 7) && ((SST39SF0_5V0 == uFlashType) || (SST39LF0_3V3  == uFlashType)) )
+        {
+			sprintf(szTempString, "Manufacturer Id = 0x%02x (SST)", uManufacturerID);
+			DrawString(2, 52, szTempString, RGB_GREEN);
+			sprintf(szTempString, "Type %s   Size = %dK Bytes", (SST39SF0_5V0 == uFlashType) ? "5v " : "3v3", 64 << (uFlashSize - 4));
+			DrawString(2, 54, szTempString, RGB_GREEN);
+//           s_bFlashIdValid = true;
+//           s_uFlashSize = 65536 << (uFlashSize - 4);
+        }
 
-	sprintf(szTempString, "Manufacturer Id = 0x%02x (BF)", s_uTest);
-	DrawString(2, 56, szTempString, RGB_GREEN);
-
-//	  SST39SF0_SoftwareIDExit();
-	gpio_put(PIN_FLASH_OE, true);
-	gpio_put(PIN_FLASH_WE, true);
-	gpio_set_dir_out_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0);
-
-	flash_command_byte(0x5555, 0xAA);
-	flash_command_byte(0x2AAA, 0x55);
-	flash_command_byte(0x5555, 0xF0);
-
-	gpio_put(PIN_FLASH_OE, false);
+	//	  SST39SF0_SoftwareIDExit();
+		flash_command_mode_write();
+		flash_command_sequence(0x5555, 0xF0);
+		flash_command_mode_read();
+    }
 
 
 	sd_card_t *pSD = sd_get_by_num(0);
@@ -198,22 +250,7 @@ int main()
 				{
 					for(u32 i=0; i<uBytesRead; ++i)
 					{
-						// Disable Data Bus And Set Address
-						gpio_put(PIN_DATA_OE, false);
-						gpio_set_dir_out_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0);
-						gpio_put(PIN_LATCH_ADDRESS, true);
-						gpio_put_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0, (uRomOffset + i) << PIN_IO0);
-
-						// Latch Address Lines
-						busy_wait_at_least_cycles(5);
-						gpio_put(PIN_LATCH_ADDRESS, false);
-
-						// Enable And Read The Data Bus
-						gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
-						gpio_put(PIN_DATA_OE, true);
-
-						busy_wait_at_least_cycles(15);
-						const u8 uDataBus = (gpio_get_all() >> PIN_IO0) & 0xFF;
+						const u8 uDataBus = flash_read_byte(uRomOffset + i);
 
 						if (s_aReadBuffer[i] != uDataBus)
 						{
@@ -279,28 +316,11 @@ int main()
 
 		for (u32 i=0; i<16; ++i)
 		{
-			// Disable Data Bus And Set Address
-			gpio_put(PIN_DATA_OE, false);
-			gpio_set_dir_out_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0);
-			gpio_put(PIN_LATCH_ADDRESS, true);
-			gpio_put_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0, (uAddress + i) << PIN_IO0);
-
-			// Latch Address Lines
-			busy_wait_at_least_cycles(5);
-			gpio_put(PIN_LATCH_ADDRESS, false);
-
-			// Enable And Read The Data Bus
-			gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
-			gpio_put(PIN_DATA_OE, true);
-
-			busy_wait_at_least_cycles(15);
-			aLineBuffer[i] = (gpio_get_all() >> PIN_IO0) & 0xFF;
-
+			aLineBuffer[i] = flash_read_byte(uAddress + i);
 			// if (Vic8kCombo[uAddress + i] != aLineBuffer[i])
 			// 	aLineBuffer[i] = '*';
 		}
 
-//		SpiNorFlash_Read(uAddress, 16, aLineBuffer);
 		FormatHexDumpLine(3, 10 + uLine, uAddress, aLineBuffer, RGB_CYAN);
 	}
 
