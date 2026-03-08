@@ -17,23 +17,49 @@
 
 enum flash_manufacturer
 {
+	FLASH_MANUFACTURER_UNKNOWN		= 0x00,
 	FLASH_MANUFACTURER_SST			= 0xBF,
 	FLASH_MANUFACTURER_MACRONIX		= 0xC2
 };
 
-#define SST39SF0_5V0            (0xB)
-#define SST39LF0_3V3            (0xD)
-//#define SST39SF0_SIZE_128K (0xB5)       /* 1024 Mb ... 128k x 8 */
-//#define SST39SF0_SIZE_256K (0xB6)       /* 2048 Mb ... 256k x 8 */
-//#define SST39SF0_SIZE_512K (0xB7)       /* 4096 Mb ... 512k x 8 */
-#define SST39SF0_PAGE_SHIFT (8)
-#define SST39SF0_SECTOR_SHIFT (12)
-#define SST39SF0_PAGE_SIZE (1 << SST39SF0_PAGE_SHIFT)
-#define SST39SF0_SECTOR_SIZE (1 << SST39SF0_SECTOR_SHIFT)
-#define SST39SF0_PAGES_PER_SECTOR (1 << (SST39SF0_SECTOR_SHIFT - SST39SF0_PAGE_SHIFT))
-#define SST39SF0_ERASED_VALUE (0xFF)
+enum flash_boot_sector
+{
+	FLASH_BOOT_SECTOR_NONE = 0,
+	FLASH_BOOT_SECTOR_TOP,
+	FLASH_BOOT_SECTOR_BOTTOM
+};
 
-enum vga_pins
+enum flash_voltage
+{
+	FLASH_VOLTAGE_3V3 = 0x33,
+	FLASH_VOLTAGE_5V0 = 0x50
+};
+
+typedef struct 
+{
+	u8		m_bInitialised;
+	u8		m_eManufacturer;
+	u8		m_eVoltage;
+	u8		m_eBootSector;
+	u8		m_u16Bit;
+	u8		m_uSoftwareIdExit;
+	u8		m_uPadding;
+	u8		m_uNumSectors;
+	u32		m_uSize;
+} flashROM;
+
+
+// #define SST39SF0_SIZE_128K (0xB5)       /* 1024 Mb ... 128k x 8 */
+// #define SST39SF0_SIZE_256K (0xB6)       /* 2048 Mb ... 256k x 8 */
+// #define SST39SF0_SIZE_512K (0xB7)       /* 4096 Mb ... 512k x 8 */
+// #define SST39SF0_PAGE_SHIFT (8)
+// #define SST39SF0_SECTOR_SHIFT (12)
+// #define SST39SF0_PAGE_SIZE (1 << SST39SF0_PAGE_SHIFT)
+// #define SST39SF0_SECTOR_SIZE (1 << SST39SF0_SECTOR_SHIFT)
+// #define SST39SF0_PAGES_PER_SECTOR (1 << (SST39SF0_SECTOR_SHIFT - SST39SF0_PAGE_SHIFT))
+// #define SST39SF0_ERASED_VALUE (0xFF)
+
+enum mcu_pins
 {
 	PIN_RED = 0,
 	PIN_GREEN,
@@ -55,9 +81,10 @@ enum vga_pins
 enum rgbColours {RGB_BLACK, RGB_RED, RGB_GREEN, RGB_YELLOW, RGB_BLUE, RGB_MAGENTA, RGB_CYAN, RGB_WHITE};
 
 static volatile u8 s_aReadBuffer[1024];
+static flashROM s_flashROM = {0};
 
 //------------------------------------------------------------------------------------------------
-//----                                                                                        ----
+//---- ascii_to_petscii                                                                       ----
 //------------------------------------------------------------------------------------------------
 u8 ascii_to_petscii(const u8 c)
 {
@@ -79,9 +106,9 @@ u8 ascii_to_petscii(const u8 c)
 }
 
 //------------------------------------------------------------------------------------------------
-//----                                                                                        ----
+//---- FormatHexDumpLine	                                                                  ----
 //------------------------------------------------------------------------------------------------
-void FormatHexDumpLine(u32 uCharX, u32 uCharY, const u32 uAddress, const u8* pLineBuffer, const u8 uColour)
+void FormatHexDumpLine(u32 uCharX, u32 uCharY, const u32 uAddress, const u8* pLineBuffer, const u8 uColour, const bool bASCII)
 {
 	// Write Address Offset in 6 byte hex.
 	for(int i=5; i>=0; --i)
@@ -94,8 +121,9 @@ void FormatHexDumpLine(u32 uCharX, u32 uCharY, const u32 uAddress, const u8* pLi
 		DrawPetsciiChar((uCharX + 8 + (uIndex * 3)) << 3, uCharY << 3, uHexPair >> 8, uColour);
 		DrawPetsciiChar((uCharX + 9 + (uIndex * 3)) << 3, uCharY << 3, uHexPair & 255, uColour);
 
-		// Write ASCII version of byte.
-		DrawPetsciiChar((uCharX + 57 + uIndex) << 3, uCharY << 3, ascii_to_petscii(pLineBuffer[uIndex]), uColour);
+		// Write ASCII or PETSCII version of byte.
+		const u8 uCurrentChar = (bASCII) ? ascii_to_petscii(pLineBuffer[uIndex]) : pLineBuffer[uIndex];
+		DrawPetsciiChar((uCharX + 57 + uIndex) << 3, uCharY << 3, uCurrentChar, uColour);
 	}
 }
 
@@ -179,7 +207,7 @@ void flash_command_sequence(const u32 uAddress, const u8 uData)
 }
 
 //------------------------------------------------------------------------------------------------
-//----                                                                                        ----
+//---- flash_software_id_entry                                                                ----
 //------------------------------------------------------------------------------------------------
 void flash_software_id_entry()
 {
@@ -189,17 +217,7 @@ void flash_software_id_entry()
 }
 
 //------------------------------------------------------------------------------------------------
-//----                                                                                        ----
-//------------------------------------------------------------------------------------------------
-void flash_software_id_exit()
-{
-	flash_command_mode_write();
-	flash_command_sequence(0x5555, 0xF0);
-	flash_command_mode_read();
-}
-
-//------------------------------------------------------------------------------------------------
-//----                                                                                        ----
+//---- flash_reset                                                                            ----
 //------------------------------------------------------------------------------------------------
 void flash_reset()
 {
@@ -209,11 +227,113 @@ void flash_reset()
 }
 
 //------------------------------------------------------------------------------------------------
+//---- flash_software_id_exit                                                                 ----
+//------------------------------------------------------------------------------------------------
+void flash_software_id_exit()
+{
+	if (s_flashROM.m_bInitialised)
+	{
+		if (s_flashROM.m_uSoftwareIdExit)
+		{
+			flash_command_mode_write();
+			flash_command_sequence(0x5555, 0xF0);
+			flash_command_mode_read();
+		}
+		else
+		{
+			// If The Flash ROM Does Not Support Software Id Exit
+			// We Must Reset The Flash To Return To Read Mode.
+			flash_reset();
+		}
+	}
+}
+
+//------------------------------------------------------------------------------------------------
+//----                                                                                        ----
+//------------------------------------------------------------------------------------------------
+bool FlashInitialise(void)
+{
+	if (s_flashROM.m_bInitialised)
+		return false;
+
+	flash_software_id_entry();
+	sleep_ms(16);                        // Give the IC time to exit standby mode.
+
+	s_flashROM.m_eManufacturer = flash_read_byte(0);
+	switch(s_flashROM.m_eManufacturer)
+	{
+		case FLASH_MANUFACTURER_SST:
+		{
+	 		const u8 uFlashID = flash_read_byte(1);
+			switch (uFlashID >> 4)
+			{
+				case 0xB:
+					s_flashROM.m_eVoltage = FLASH_VOLTAGE_5V0;
+				break;
+
+				case 0xD:
+					s_flashROM.m_eVoltage = FLASH_VOLTAGE_3V3;
+				break;
+
+				default:
+					return (false);
+			}
+
+			if ( ((uFlashID & 15) < 4) || ((uFlashID & 15) > 7) )
+				return (false);
+
+			s_flashROM.m_eBootSector = FLASH_BOOT_SECTOR_NONE;
+			s_flashROM.m_u16Bit = false;
+			s_flashROM.m_uSoftwareIdExit = true;
+			s_flashROM.m_uNumSectors = 1 << (uFlashID & 15);
+			s_flashROM.m_uSize = s_flashROM.m_uNumSectors << 12;
+			s_flashROM.m_bInitialised = true;
+		}
+		break;
+
+		case FLASH_MANUFACTURER_MACRONIX:
+		{
+			s_flashROM.m_eVoltage = FLASH_VOLTAGE_5V0;
+			s_flashROM.m_u16Bit = true;
+			s_flashROM.m_uSoftwareIdExit = false;
+				
+			const u16 uFlashType = swap_u16(flash_read_word(1));
+			switch (uFlashType)
+			{
+				case 0x2251:
+					s_flashROM.m_eBootSector = FLASH_BOOT_SECTOR_TOP;
+				break;
+
+				case 0x2257:
+					s_flashROM.m_eBootSector = FLASH_BOOT_SECTOR_BOTTOM;
+				break;
+
+				default:
+					return (false);
+			}
+
+			s_flashROM.m_uNumSectors = 7;
+			s_flashROM.m_uSize = 256 << 10;
+			s_flashROM.m_bInitialised = true;
+		}
+		break;
+
+		default:
+			return (false);
+	}
+
+	flash_software_id_exit();
+
+	return (s_flashROM.m_bInitialised);
+}
+
+//------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
 int main()
 {
     stdio_init_all();
+	s_flashROM.m_bInitialised = false;
 
 	gpio_init(PIN_FLASH_RESET);
     gpio_set_dir(PIN_FLASH_RESET, GPIO_OUT);
@@ -260,82 +380,48 @@ int main()
 	gpio_put(PIN_FLASH_RESET, true);
 
     initVGA(PIN_RED, PIN_HSYNC, PIN_VSYNC);
+
+	char szTempString[128];
 	FilledRectangle(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB_GREEN);
 	FilledRectangle(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB_BLACK);
 
-	flash_software_id_entry();
-	sleep_ms(16);                        // Give the IC time to exit standby mode.
-
-	const u8 uManufacturerID = flash_read_byte(0);
-	char szTempString[128];
-
-	switch(uManufacturerID)
+	if (FlashInitialise())
 	{
-		case FLASH_MANUFACTURER_SST:
+		switch (s_flashROM.m_eManufacturer)
 		{
-			const u8 uFlashID = flash_read_byte(1);
-			const u8 uFlashSize = (uFlashID & 15);
-			const u8 uFlashType = (uFlashID >> 4);
+			case FLASH_MANUFACTURER_SST:
+	 			DrawString(2, 52, "Flash Manufacturer SST", RGB_GREEN);
+			break;
 
-			if( (uFlashSize >= 4) && (uFlashSize <= 7) && ((SST39SF0_5V0 == uFlashType) || (SST39LF0_3V3  == uFlashType)) )
-			{
-				sprintf(szTempString, "Manufacturer Id = 0x%02x (SST)", uManufacturerID);
-				DrawString(2, 52, szTempString, RGB_GREEN);
-				sprintf(szTempString, "Type %s   Size = %dK Bytes", (SST39SF0_5V0 == uFlashType) ? "5v " : "3v3", 64 << (uFlashSize - 4));
-				DrawString(2, 54, szTempString, RGB_GREEN);
-	//           s_bFlashIdValid = true;
-	//           s_uFlashSize = 65536 << (uFlashSize - 4);
-			}
-			else
-			{
-				DrawString(2, 54, "Unknown IC", RGB_RED);
-				assert(0);
-			}
+			case FLASH_MANUFACTURER_MACRONIX:
+	 			DrawString(2, 52, "Flash Manufacturer MACRONIX", RGB_GREEN);
+			break;
 
-			flash_software_id_exit();
+			default:
+	 			DrawString(2, 52, "Flash Manufacturer UNKNOWN", RGB_GREEN);
+			break;
 		}
-		break;
 
-		case FLASH_MANUFACTURER_MACRONIX:
+		sprintf(szTempString, "Voltage %d.%d    %d Bit", s_flashROM.m_eVoltage >> 4, s_flashROM.m_eVoltage & 15, s_flashROM.m_u16Bit ? 16 : 8);
+		DrawString(32, 52, szTempString, RGB_GREEN);
+
+		switch (s_flashROM.m_eBootSector)
 		{
-			sprintf(szTempString, "Manufacturer Id = 0x%02x (MACRONIX)", uManufacturerID);
-			DrawString(2, 52, szTempString, RGB_GREEN);
+			case FLASH_BOOT_SECTOR_TOP:
+	 			DrawString(2, 54, "Boot Sector Top", RGB_GREEN);
+			break;
 
-			const u16 uFlashType = swap_u16(flash_read_word(1));
-			if (0x2251 == uFlashType)
-			{
-				DrawString(2, 54, "Top Boot Sector  Size = 256K Bytes", RGB_GREEN);
-			}
-			else if (0x2257 == uFlashType)
-			{
-				DrawString(2, 54, "Bottom Boot Sector  Size = 256K Bytes", RGB_GREEN);
-			}
-			else
-			{
-				DrawString(2, 54, "Unknown IC", RGB_RED);
-				assert(0);
-			}
+			case FLASH_BOOT_SECTOR_BOTTOM:
+	 			DrawString(2, 54, "Boot Sector Bottom", RGB_GREEN);
+			break;
 
-			const u16 uSectorProtect = swap_u16(flash_read_word(2));
-			if (0 == uSectorProtect)
-			{
-				DrawString(2, 56, "Sector 0 Is Not Protected", RGB_GREEN);
-			}
-			else
-			{
-				DrawString(2, 56, "Sector 0 Is Protected!", RGB_GREEN);
-			}
-
-			// No Software id Exit For Macronix... Must Assert The Reset Pin To Return To Read Mode.
-			flash_reset();
+			default:
+	 			DrawString(2, 54, "Boot Sector None", RGB_GREEN);
+			break;
 		}
-		break;
 
-		default:
-		{
-			DrawString(2, 54, "Unknown IC", RGB_RED);
-			assert(0);
-		}
+		sprintf(szTempString, "Sector Count = %d   Size = %d KBytes", s_flashROM.m_uNumSectors, s_flashROM.m_uSize >> 10);
+		DrawString(22, 54, szTempString, RGB_GREEN);
 	}
 
 	sd_card_t *pSD = sd_get_by_num(0);
@@ -437,7 +523,7 @@ int main()
 	u32 uOnTime = 0;
 	const u32 uFlashOffset = 0;
 
-/*	
+/*
 	for (u32 uLine=0; uLine<40; ++uLine)
 	{
 		u8 aLineBuffer[16];
@@ -448,7 +534,7 @@ int main()
 			aLineBuffer[i] = flash_read_byte(uAddress + i);
 		}
 
-		FormatHexDumpLine(3, 10 + uLine, uAddress, aLineBuffer, RGB_CYAN);
+		FormatHexDumpLine(3, 10 + uLine, uAddress, aLineBuffer, RGB_CYAN, false);
 	}
 */
 	for (u32 uLine=0; uLine<40; ++uLine)
@@ -461,7 +547,7 @@ int main()
 			aLineBuffer[i] = flash_read_word(uAddress + i);
 		}
 
-		FormatHexDumpLine(3, 10 + uLine, uAddress, (u8*)&aLineBuffer, RGB_CYAN);
+		FormatHexDumpLine(3, 10 + uLine, uAddress, (u8*)&aLineBuffer, RGB_CYAN, true);
 	}
 
 	while(true)
