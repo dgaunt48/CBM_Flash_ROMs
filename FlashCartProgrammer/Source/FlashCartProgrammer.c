@@ -53,6 +53,28 @@ static volatile u8 s_aReadBuffer[1024];
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
+u8 ascii_to_petscii(const u8 c)
+{
+    // Handle ASCII Lowercase (97-122) Maps 'a'-'z' to ROM Lowwercase (1-26)
+    if (c >= 97 && c <= 122)
+		return c - 96;
+
+    // Special Case For '@'
+    if (c == 64)
+		return 0;
+
+    // Handle Space (32) through 'Z' (90)
+	// This includes numbers and maps ASCII Uppercase (65-90) to ROM Uppercase (65-90)
+    if (c >= 32 && c <= 90)
+		return c;
+
+    // Default to Space
+    return 32; 
+}
+
+//------------------------------------------------------------------------------------------------
+//----                                                                                        ----
+//------------------------------------------------------------------------------------------------
 void FormatHexDumpLine(u32 uCharX, u32 uCharY, const u32 uAddress, const u8* pLineBuffer, const u8 uColour)
 {
 	// Write Address Offset in 6 byte hex.
@@ -67,7 +89,7 @@ void FormatHexDumpLine(u32 uCharX, u32 uCharY, const u32 uAddress, const u8* pLi
 		DrawPetsciiChar((uCharX + 9 + (uIndex * 3)) << 3, uCharY << 3, uHexPair & 255, uColour);
 
 		// Write ASCII version of byte.
-		DrawPetsciiChar((uCharX + 57 + uIndex) << 3, uCharY << 3, pLineBuffer[uIndex], uColour);
+		DrawPetsciiChar((uCharX + 57 + uIndex) << 3, uCharY << 3, ascii_to_petscii(pLineBuffer[uIndex]), uColour);
 	}
 }
 
@@ -94,6 +116,24 @@ u8 flash_read_byte(const u32 uAddress)
 	gpio_put(PIN_DATA_OE, true);
 	busy_wait_at_least_cycles(15);
 	return (gpio_get_all() >> PIN_IO0) & 0xFF;
+}
+
+//------------------------------------------------------------------------------------------------
+//---- flash_read_word                                                                        ----
+//------------------------------------------------------------------------------------------------
+u16 flash_read_word(const u32 uAddress)
+{
+	flash_latch_address(uAddress);
+	gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
+	gpio_put(PIN_DATA_OE, true);
+	busy_wait_at_least_cycles(15);
+
+//	return (gpio_get_all() >> PIN_IO0) & 0xFFFF;
+
+	// Endian Swap
+	u16 uReturnValue = (gpio_get_all() << 8 >> PIN_IO0) & 0xFF00;
+	uReturnValue |= (gpio_get_all() >> 8 >> PIN_IO0) & 0x00FF;
+	return uReturnValue;
 }
 
 //------------------------------------------------------------------------------------------------
@@ -194,7 +234,7 @@ int main()
 
 	char szTempString[128];
 
-
+/*
 //    SST39SF0_SoftwareIDEntry();
 	flash_command_mode_write();
 	flash_command_sequence(0x5555, 0x90);
@@ -224,7 +264,7 @@ int main()
 		flash_command_sequence(0x5555, 0xF0);
 		flash_command_mode_read();
     }
-
+*/
 
 	sd_card_t *pSD = sd_get_by_num(0);
 
@@ -232,7 +272,8 @@ int main()
 	if (FR_OK == fr)
 	{
 		FIL fil;
-		const char* const filename = "VicTestRom.bin";
+//		const char* const filename = "VicTestRom.bin";
+		const char* const filename = "Kickstart_1_2.rom";
 
 		fr = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
 		if (FR_OK == fr)
@@ -248,6 +289,20 @@ int main()
 				
 				if(uBytesRead > 0)
 				{
+					u32 uWordsRead = uBytesRead >> 1;
+					for(u32 i=0; i<uWordsRead; ++i)
+					{
+						const u16 uDataBus = flash_read_word(uRomOffset + i);
+
+						if (((u16*)s_aReadBuffer)[i] != uDataBus)
+						{
+							bVerifySuccess = false;
+							break;
+						}
+					}
+
+					uRomOffset += uWordsRead;
+/*
 					for(u32 i=0; i<uBytesRead; ++i)
 					{
 						const u8 uDataBus = flash_read_byte(uRomOffset + i);
@@ -258,8 +313,9 @@ int main()
 							break;
 						}
 					}
-
+					
 					uRomOffset += uBytesRead;
+*/
 				}
 				else
 				{
@@ -291,7 +347,7 @@ int main()
 		DrawString(2, 2, szTempString, RGB_RED);
 	}
 
-    // FIL fil;
+	// FIL fil;
     // const char* const filename = "filename.txt";
     // fr = f_open(&fil, filename, FA_OPEN_APPEND | FA_WRITE);
 
@@ -309,6 +365,7 @@ int main()
 	u32 uOnTime = 0;
 	const u32 uFlashOffset = 0;
 
+/*	
 	for (u32 uLine=0; uLine<40; ++uLine)
 	{
 		u8 aLineBuffer[16];
@@ -317,11 +374,22 @@ int main()
 		for (u32 i=0; i<16; ++i)
 		{
 			aLineBuffer[i] = flash_read_byte(uAddress + i);
-			// if (Vic8kCombo[uAddress + i] != aLineBuffer[i])
-			// 	aLineBuffer[i] = '*';
 		}
 
 		FormatHexDumpLine(3, 10 + uLine, uAddress, aLineBuffer, RGB_CYAN);
+	}
+*/
+	for (u32 uLine=0; uLine<40; ++uLine)
+	{
+		u16 aLineBuffer[8];
+		const u32 uAddress = uFlashOffset + (uLine << 3);
+
+		for (u32 i=0; i<8; ++i)
+		{
+			aLineBuffer[i] = flash_read_word(uAddress + i);
+		}
+
+		FormatHexDumpLine(3, 10 + uLine, uAddress, (u8*)&aLineBuffer, RGB_CYAN);
 	}
 
 	while(true)
