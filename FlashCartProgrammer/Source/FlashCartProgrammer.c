@@ -15,7 +15,12 @@
 #include "ff.h"
 #include "hw_config.h"
 
-#define SST39SF0_MANUFACTURER   (0xBF)    // flash manufacturer is SST
+enum flash_manufacturer
+{
+	FLASH_MANUFACTURER_SST			= 0xBF,
+	FLASH_MANUFACTURER_MACRONIX		= 0xC2
+};
+
 #define SST39SF0_5V0            (0xB)
 #define SST39LF0_3V3            (0xD)
 //#define SST39SF0_SIZE_128K (0xB5)       /* 1024 Mb ... 128k x 8 */
@@ -28,7 +33,8 @@
 #define SST39SF0_PAGES_PER_SECTOR (1 << (SST39SF0_SECTOR_SHIFT - SST39SF0_PAGE_SHIFT))
 #define SST39SF0_ERASED_VALUE (0xFF)
 
-enum vga_pins {
+enum vga_pins
+{
 	PIN_RED = 0,
 	PIN_GREEN,
 	PIN_BLUE,
@@ -41,7 +47,7 @@ enum vga_pins {
 	PIN_BYTE_MODE = 36,
 	PIN_FLASH_WE,
 	PIN_FLASH_OE,
-	PIN_FLASH_CE
+	PIN_FLASH_RESET
 };
 
 #define ADDRESS_BUS_SIZE		(20)
@@ -127,13 +133,7 @@ u16 flash_read_word(const u32 uAddress)
 	gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
 	gpio_put(PIN_DATA_OE, true);
 	busy_wait_at_least_cycles(15);
-
-//	return (gpio_get_all() >> PIN_IO0) & 0xFFFF;
-
-	// Endian Swap
-	u16 uReturnValue = (gpio_get_all() << 8 >> PIN_IO0) & 0xFF00;
-	uReturnValue |= (gpio_get_all() >> 8 >> PIN_IO0) & 0x00FF;
-	return uReturnValue;
+	return swap_u16(gpio_get_all() >> PIN_IO0);
 }
 
 //------------------------------------------------------------------------------------------------
@@ -181,9 +181,43 @@ void flash_command_sequence(const u32 uAddress, const u8 uData)
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
+void flash_software_id_entry()
+{
+	flash_command_mode_write();
+	flash_command_sequence(0x5555, 0x90);
+	flash_command_mode_read();
+}
+
+//------------------------------------------------------------------------------------------------
+//----                                                                                        ----
+//------------------------------------------------------------------------------------------------
+void flash_software_id_exit()
+{
+	flash_command_mode_write();
+	flash_command_sequence(0x5555, 0xF0);
+	flash_command_mode_read();
+}
+
+//------------------------------------------------------------------------------------------------
+//----                                                                                        ----
+//------------------------------------------------------------------------------------------------
+void flash_reset()
+{
+	gpio_put(PIN_FLASH_RESET, false);
+	sleep_us(1);
+	gpio_put(PIN_FLASH_RESET, true);
+}
+
+//------------------------------------------------------------------------------------------------
+//----                                                                                        ----
+//------------------------------------------------------------------------------------------------
 int main()
 {
     stdio_init_all();
+
+	gpio_init(PIN_FLASH_RESET);
+    gpio_set_dir(PIN_FLASH_RESET, GPIO_OUT);
+	gpio_put(PIN_FLASH_RESET, false);
 
 	// Data Bus Off
 	gpio_init(PIN_DATA_OE);
@@ -215,11 +249,6 @@ int main()
     gpio_set_dir(PIN_FLASH_OE, GPIO_OUT);
 	gpio_put(PIN_FLASH_OE, false);
 
-	// Flash IC Is Enabled (Only For 16 Bit IC Socket)
-	gpio_init(PIN_FLASH_CE);
-    gpio_set_dir(PIN_FLASH_CE, GPIO_OUT);
-	gpio_put(PIN_FLASH_CE, false);
-
 	// Set All IO Lines To Output
 	for(u32 i=0; i<ADDRESS_BUS_SIZE; ++i)
 	{
@@ -228,43 +257,86 @@ int main()
 		gpio_put(PIN_IO0 + i, 0);
 	}
 
+	gpio_put(PIN_FLASH_RESET, true);
+
     initVGA(PIN_RED, PIN_HSYNC, PIN_VSYNC);
 	FilledRectangle(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB_GREEN);
 	FilledRectangle(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB_BLACK);
 
-	char szTempString[128];
-
-/*
-//    SST39SF0_SoftwareIDEntry();
-	flash_command_mode_write();
-	flash_command_sequence(0x5555, 0x90);
-	flash_command_mode_read();
-    sleep_ms(16);                        // Give the IC time to exit standby mode.
+	flash_software_id_entry();
+	sleep_ms(16);                        // Give the IC time to exit standby mode.
 
 	const u8 uManufacturerID = flash_read_byte(0);
+	char szTempString[128];
 
-    if (SST39SF0_MANUFACTURER == uManufacturerID)
-    {
-        const u8 uFlashID = flash_read_byte(1);
-        const u8 uFlashSize = (uFlashID & 15);
-        const u8 uFlashType = (uFlashID >> 4);
+	switch(uManufacturerID)
+	{
+		case FLASH_MANUFACTURER_SST:
+		{
+			const u8 uFlashID = flash_read_byte(1);
+			const u8 uFlashSize = (uFlashID & 15);
+			const u8 uFlashType = (uFlashID >> 4);
 
-        if( (uFlashSize >= 4) && (uFlashSize <= 7) && ((SST39SF0_5V0 == uFlashType) || (SST39LF0_3V3  == uFlashType)) )
-        {
-			sprintf(szTempString, "Manufacturer Id = 0x%02x (SST)", uManufacturerID);
+			if( (uFlashSize >= 4) && (uFlashSize <= 7) && ((SST39SF0_5V0 == uFlashType) || (SST39LF0_3V3  == uFlashType)) )
+			{
+				sprintf(szTempString, "Manufacturer Id = 0x%02x (SST)", uManufacturerID);
+				DrawString(2, 52, szTempString, RGB_GREEN);
+				sprintf(szTempString, "Type %s   Size = %dK Bytes", (SST39SF0_5V0 == uFlashType) ? "5v " : "3v3", 64 << (uFlashSize - 4));
+				DrawString(2, 54, szTempString, RGB_GREEN);
+	//           s_bFlashIdValid = true;
+	//           s_uFlashSize = 65536 << (uFlashSize - 4);
+			}
+			else
+			{
+				DrawString(2, 54, "Unknown IC", RGB_RED);
+				assert(0);
+			}
+
+			flash_software_id_exit();
+		}
+		break;
+
+		case FLASH_MANUFACTURER_MACRONIX:
+		{
+			sprintf(szTempString, "Manufacturer Id = 0x%02x (MACRONIX)", uManufacturerID);
 			DrawString(2, 52, szTempString, RGB_GREEN);
-			sprintf(szTempString, "Type %s   Size = %dK Bytes", (SST39SF0_5V0 == uFlashType) ? "5v " : "3v3", 64 << (uFlashSize - 4));
-			DrawString(2, 54, szTempString, RGB_GREEN);
-//           s_bFlashIdValid = true;
-//           s_uFlashSize = 65536 << (uFlashSize - 4);
-        }
 
-	//	  SST39SF0_SoftwareIDExit();
-		flash_command_mode_write();
-		flash_command_sequence(0x5555, 0xF0);
-		flash_command_mode_read();
-    }
-*/
+			const u16 uFlashType = swap_u16(flash_read_word(1));
+			if (0x2251 == uFlashType)
+			{
+				DrawString(2, 54, "Top Boot Sector  Size = 256K Bytes", RGB_GREEN);
+			}
+			else if (0x2257 == uFlashType)
+			{
+				DrawString(2, 54, "Bottom Boot Sector  Size = 256K Bytes", RGB_GREEN);
+			}
+			else
+			{
+				DrawString(2, 54, "Unknown IC", RGB_RED);
+				assert(0);
+			}
+
+			const u16 uSectorProtect = swap_u16(flash_read_word(2));
+			if (0 == uSectorProtect)
+			{
+				DrawString(2, 56, "Sector 0 Is Not Protected", RGB_GREEN);
+			}
+			else
+			{
+				DrawString(2, 56, "Sector 0 Is Protected!", RGB_GREEN);
+			}
+
+			// No Software id Exit For Macronix... Must Assert The Reset Pin To Return To Read Mode.
+			flash_reset();
+		}
+		break;
+
+		default:
+		{
+			DrawString(2, 54, "Unknown IC", RGB_RED);
+			assert(0);
+		}
+	}
 
 	sd_card_t *pSD = sd_get_by_num(0);
 
@@ -395,7 +467,7 @@ int main()
 	while(true)
 	{
 		sprintf(szTempString, "Time On = %d.%d", uOnTime / 50, (uOnTime % 50) * 2);
-		DrawString(2, 58, szTempString, RGB_YELLOW);
+		DrawString(58, 2, szTempString, RGB_YELLOW);
 		sleep_ms(16);
 		uOnTime++;
 	}
