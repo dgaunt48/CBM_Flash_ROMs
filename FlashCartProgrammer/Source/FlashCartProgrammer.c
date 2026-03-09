@@ -249,7 +249,7 @@ void flash_software_id_exit()
 }
 
 //------------------------------------------------------------------------------------------------
-//----                                                                                        ----
+//---- FlashInitialise                                                                        ----
 //------------------------------------------------------------------------------------------------
 bool FlashInitialise(void)
 {
@@ -328,6 +328,74 @@ bool FlashInitialise(void)
 }
 
 //------------------------------------------------------------------------------------------------
+//---- FlashRead                                                                              ----
+//------------------------------------------------------------------------------------------------
+bool FlashRead(void* pData, const u32 uAddress, const u32 uLength)
+{
+    assert(s_flashROM.m_bInitialised);
+
+	if ((uAddress + uLength) > s_flashROM.m_uSize)
+		return false;
+
+	if (s_flashROM.m_u16Bit)
+	{
+	    assert(0 == uAddress & 1);
+	    assert(0 == uLength & 1);
+		u16* pWordData = (u16*)pData;
+		const u32 uWordLength = (uLength + 1) >> 1;
+
+		for (u32 i=0; i<uWordLength; ++i)
+			pWordData[i] = flash_read_word((uAddress >> 1) + i);
+
+		return true;
+	}
+
+	u8* pByteData = (u8*)pData;
+
+	for (u32 i=0; i<uLength; ++i)
+		pByteData[i] = flash_read_byte(uAddress + i);
+
+	return true;
+}
+
+//------------------------------------------------------------------------------------------------
+//---- FlashVerify                                                                            ----
+//------------------------------------------------------------------------------------------------
+bool FlashVerify(void* pCompareData, const u32 uAddress, const u32 uLength)
+{
+    assert(s_flashROM.m_bInitialised);
+
+	if ((uAddress + uLength) > s_flashROM.m_uSize)
+		return false;
+
+	if (s_flashROM.m_u16Bit)
+	{
+	    assert(0 == uAddress & 1);
+	    assert(0 == uLength & 1);
+		u16* pWordData = (u16*)pCompareData;
+		const u32 uWordLength = (uLength + 1) >> 1;
+
+		for (u32 i=0; i<uWordLength; ++i)
+		{
+			if (pWordData[i] != flash_read_word((uAddress >> 1) + i))
+				return false;
+		}
+
+		return true;
+	}
+
+	u8* pByteData = (u8*)pCompareData;
+
+	for (u32 i=0; i<uLength; ++i)
+	{
+		if (pByteData[i] != flash_read_byte(uAddress + i))
+			return false;
+	}
+
+	return true;
+}
+
+//------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
 int main()
@@ -385,44 +453,54 @@ int main()
 	FilledRectangle(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB_GREEN);
 	FilledRectangle(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB_BLACK);
 
-	if (FlashInitialise())
+	if (!FlashInitialise())
 	{
-		switch (s_flashROM.m_eManufacturer)
-		{
-			case FLASH_MANUFACTURER_SST:
-	 			DrawString(2, 52, "Flash Manufacturer SST", RGB_GREEN);
-			break;
-
-			case FLASH_MANUFACTURER_MACRONIX:
-	 			DrawString(2, 52, "Flash Manufacturer MACRONIX", RGB_GREEN);
-			break;
-
-			default:
-	 			DrawString(2, 52, "Flash Manufacturer UNKNOWN", RGB_GREEN);
-			break;
-		}
-
-		sprintf(szTempString, "Voltage %d.%d    %d Bit", s_flashROM.m_eVoltage >> 4, s_flashROM.m_eVoltage & 15, s_flashROM.m_u16Bit ? 16 : 8);
-		DrawString(32, 52, szTempString, RGB_GREEN);
-
-		switch (s_flashROM.m_eBootSector)
-		{
-			case FLASH_BOOT_SECTOR_TOP:
-	 			DrawString(2, 54, "Boot Sector Top", RGB_GREEN);
-			break;
-
-			case FLASH_BOOT_SECTOR_BOTTOM:
-	 			DrawString(2, 54, "Boot Sector Bottom", RGB_GREEN);
-			break;
-
-			default:
-	 			DrawString(2, 54, "Boot Sector None", RGB_GREEN);
-			break;
-		}
-
-		sprintf(szTempString, "Sector Count = %d   Size = %d KBytes", s_flashROM.m_uNumSectors, s_flashROM.m_uSize >> 10);
-		DrawString(22, 54, szTempString, RGB_GREEN);
+		// Can't Initialise Flash So Take A Guess That A Mask ROM Is Inserted.
+		s_flashROM.m_eManufacturer = FLASH_MANUFACTURER_UNKNOWN;
+		s_flashROM.m_eVoltage = FLASH_VOLTAGE_5V0;
+		s_flashROM.m_eBootSector = FLASH_BOOT_SECTOR_NONE;
+		s_flashROM.m_u16Bit = true;
+		s_flashROM.m_uSoftwareIdExit = false;
+		s_flashROM.m_uNumSectors = 0;
+		s_flashROM.m_uSize = 256 << 10;
+		s_flashROM.m_bInitialised = true;
 	}
+
+	switch (s_flashROM.m_eManufacturer)
+	{
+		case FLASH_MANUFACTURER_SST:
+			DrawString(2, 52, "Flash Manufacturer SST", RGB_GREEN);
+		break;
+
+		case FLASH_MANUFACTURER_MACRONIX:
+			DrawString(2, 52, "Flash Manufacturer MACRONIX", RGB_GREEN);
+		break;
+
+		default:
+			DrawString(2, 52, "Flash Manufacturer UNKNOWN", RGB_GREEN);
+		break;
+	}
+
+	sprintf(szTempString, "Voltage %d.%d    %d Bit", s_flashROM.m_eVoltage >> 4, s_flashROM.m_eVoltage & 15, s_flashROM.m_u16Bit ? 16 : 8);
+	DrawString(32, 52, szTempString, RGB_GREEN);
+
+	switch (s_flashROM.m_eBootSector)
+	{
+		case FLASH_BOOT_SECTOR_TOP:
+			DrawString(2, 54, "Boot Sector Top", RGB_GREEN);
+		break;
+
+		case FLASH_BOOT_SECTOR_BOTTOM:
+			DrawString(2, 54, "Boot Sector Bottom", RGB_GREEN);
+		break;
+
+		default:
+			DrawString(2, 54, "Boot Sector None", RGB_GREEN);
+		break;
+	}
+
+	sprintf(szTempString, "Sector Count = %d   Size = %d KBytes", s_flashROM.m_uNumSectors, s_flashROM.m_uSize >> 10);
+	DrawString(22, 54, szTempString, RGB_GREEN);
 
 	sd_card_t *pSD = sd_get_by_num(0);
 
@@ -430,8 +508,8 @@ int main()
 	if (FR_OK == fr)
 	{
 		FIL fil;
-//		const char* const filename = "VicTestRom.bin";
-		const char* const filename = "Kickstart_1_2.rom";
+		const char* const filename = "VicTestRom.bin";
+//		const char* const filename = "Kickstart_1_2.rom";
 
 		fr = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
 		if (FR_OK == fr)
@@ -444,41 +522,16 @@ int main()
 			while(bVerifySuccess)
 			{
 				f_read(&fil, (void*)&s_aReadBuffer, 1024, &uBytesRead);
-				
-				if(uBytesRead > 0)
+				if(0 == uBytesRead)
+					break;
+
+				if (!FlashVerify((void*)&s_aReadBuffer, uRomOffset, uBytesRead))
 				{
-					u32 uWordsRead = uBytesRead >> 1;
-					for(u32 i=0; i<uWordsRead; ++i)
-					{
-						const u16 uDataBus = flash_read_word(uRomOffset + i);
-
-						if (((u16*)s_aReadBuffer)[i] != uDataBus)
-						{
-							bVerifySuccess = false;
-							break;
-						}
-					}
-
-					uRomOffset += uWordsRead;
-/*
-					for(u32 i=0; i<uBytesRead; ++i)
-					{
-						const u8 uDataBus = flash_read_byte(uRomOffset + i);
-
-						if (s_aReadBuffer[i] != uDataBus)
-						{
-							bVerifySuccess = false;
-							break;
-						}
-					}
-					
-					uRomOffset += uBytesRead;
-*/
-				}
-				else
-				{
+					bVerifySuccess = false;
 					break;
 				}
+
+				uRomOffset += uBytesRead;
 			}
 
 			if (bVerifySuccess)
@@ -520,36 +573,17 @@ int main()
     // if (FR_OK != fr)
     //     printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
 
-	u32 uOnTime = 0;
 	const u32 uFlashOffset = 0;
-
-/*
 	for (u32 uLine=0; uLine<40; ++uLine)
 	{
 		u8 aLineBuffer[16];
 		const u32 uAddress = uFlashOffset + (uLine << 4);
 
-		for (u32 i=0; i<16; ++i)
-		{
-			aLineBuffer[i] = flash_read_byte(uAddress + i);
-		}
-
-		FormatHexDumpLine(3, 10 + uLine, uAddress, aLineBuffer, RGB_CYAN, false);
-	}
-*/
-	for (u32 uLine=0; uLine<40; ++uLine)
-	{
-		u16 aLineBuffer[8];
-		const u32 uAddress = uFlashOffset + (uLine << 3);
-
-		for (u32 i=0; i<8; ++i)
-		{
-			aLineBuffer[i] = flash_read_word(uAddress + i);
-		}
-
-		FormatHexDumpLine(3, 10 + uLine, uAddress, (u8*)&aLineBuffer, RGB_CYAN, true);
+		if (FlashRead(aLineBuffer, uAddress, 16))
+			FormatHexDumpLine(3, 10 + uLine, uAddress, aLineBuffer, RGB_CYAN, s_flashROM.m_u16Bit ? true : false);
 	}
 
+	u32 uOnTime = 0;
 	while(true)
 	{
 		sprintf(szTempString, "Time On = %d.%d", uOnTime / 50, (uOnTime % 50) * 2);
