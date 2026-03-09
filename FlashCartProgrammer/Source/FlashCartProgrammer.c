@@ -141,38 +141,26 @@ void flash_latch_address(const u32 uAddress)
 }
 
 //------------------------------------------------------------------------------------------------
-//---- flash_read_byte                                                                        ----
-//------------------------------------------------------------------------------------------------
-u8 flash_read_byte(const u32 uAddress)
-{
-	flash_latch_address(uAddress);
-	gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
-	gpio_put(PIN_DATA_OE, true);
-	busy_wait_at_least_cycles(15);
-	return (gpio_get_all() >> PIN_IO0) & 0xFF;
-}
-
-//------------------------------------------------------------------------------------------------
-//---- flash_read_word                                                                        ----
-//------------------------------------------------------------------------------------------------
-u16 flash_read_word(const u32 uAddress)
-{
-	flash_latch_address(uAddress);
-	gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
-	gpio_put(PIN_DATA_OE, true);
-	busy_wait_at_least_cycles(15);
-	return swap_u16(gpio_get_all() >> PIN_IO0);
-}
-
-//------------------------------------------------------------------------------------------------
 //---- flash_command_byte                                                                     ----
 //------------------------------------------------------------------------------------------------
 void flash_command_byte(const u32 uAddress, const u8 uData)
 {
 	flash_latch_address(uAddress);
 	gpio_put(PIN_FLASH_WE, false);														// Load Address To Flash On Falling Edge Of WE
-
 	gpio_put_masked(0xFF << PIN_IO0, (u32)uData << PIN_IO0);							// Set Data On IO Lines
+	gpio_put(PIN_DATA_OE, true);														// Assert OE High To Write
+	busy_wait_at_least_cycles(40);														// Wait Until Stable ... 30 Seems About Minimum ... So Add A Bit For Safety
+	gpio_put(PIN_FLASH_WE, true);														// Write Byte On Rising Edge Of WE
+}
+
+//------------------------------------------------------------------------------------------------
+//---- flash_command_word                                                                     ----
+//------------------------------------------------------------------------------------------------
+void flash_command_word(const u32 uAddress, const u16 uData)
+{
+	flash_latch_address(uAddress);
+	gpio_put(PIN_FLASH_WE, false);														// Load Address To Flash On Falling Edge Of WE
+	gpio_put_masked(0xFFFF << PIN_IO0, (u32)uData << PIN_IO0);							// Set Data On IO Lines
 	gpio_put(PIN_DATA_OE, true);														// Assert OE High To Write
 	busy_wait_at_least_cycles(40);														// Wait Until Stable ... 30 Seems About Minimum ... So Add A Bit For Safety
 	gpio_put(PIN_FLASH_WE, true);														// Write Byte On Rising Edge Of WE
@@ -204,6 +192,46 @@ void flash_command_sequence(const u32 uAddress, const u8 uData)
 	flash_command_byte(0x5555, 0xAA);
 	flash_command_byte(0x2AAA, 0x55);
 	flash_command_byte(uAddress, uData);
+}
+
+//------------------------------------------------------------------------------------------------
+//---- flash_read_byte                                                                        ----
+//------------------------------------------------------------------------------------------------
+u8 flash_read_byte(const u32 uAddress)
+{
+	flash_latch_address(uAddress);
+	gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
+	gpio_put(PIN_DATA_OE, true);
+	busy_wait_at_least_cycles(15);
+	return (gpio_get_all() >> PIN_IO0) & 0xFF;
+}
+
+//------------------------------------------------------------------------------------------------
+//---- flash_read_word                                                                        ----
+//------------------------------------------------------------------------------------------------
+u16 flash_read_word(const u32 uAddress)
+{
+	flash_latch_address(uAddress);
+	gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
+	gpio_put(PIN_DATA_OE, true);
+	busy_wait_at_least_cycles(15);
+	return swap_u16(gpio_get_all() >> PIN_IO0);
+}
+
+//------------------------------------------------------------------------------------------------
+//---- flash_write_word                                                                       ----
+//------------------------------------------------------------------------------------------------
+void flash_write_word(const u32 uAddress, const u16 uData)
+{
+	flash_command_mode_write();
+	flash_command_sequence(0x5555, 0xA0);
+	flash_command_word(uAddress, uData);
+	flash_command_mode_read();
+	gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
+	do
+	{
+		busy_wait_at_least_cycles(9);
+	} while ( ((gpio_get_all() >> PIN_IO0) & 0x80) != (uData & 0x80));
 }
 
 //------------------------------------------------------------------------------------------------
@@ -339,8 +367,8 @@ bool FlashRead(void* pData, const u32 uAddress, const u32 uLength)
 
 	if (s_flashROM.m_u16Bit)
 	{
-	    assert(0 == uAddress & 1);
-	    assert(0 == uLength & 1);
+	    assert(0 == (uAddress & 1));
+	    assert(0 == (uLength & 1));
 		u16* pWordData = (u16*)pData;
 		const u32 uWordLength = (uLength + 1) >> 1;
 
@@ -361,7 +389,7 @@ bool FlashRead(void* pData, const u32 uAddress, const u32 uLength)
 //------------------------------------------------------------------------------------------------
 //---- FlashVerify                                                                            ----
 //------------------------------------------------------------------------------------------------
-bool FlashVerify(void* pCompareData, const u32 uAddress, const u32 uLength)
+bool FlashVerify(const void* pCompareData, const u32 uAddress, const u32 uLength)
 {
     assert(s_flashROM.m_bInitialised);
 
@@ -370,8 +398,8 @@ bool FlashVerify(void* pCompareData, const u32 uAddress, const u32 uLength)
 
 	if (s_flashROM.m_u16Bit)
 	{
-	    assert(0 == uAddress & 1);
-	    assert(0 == uLength & 1);
+	    assert(0 == (uAddress & 1));
+	    assert(0 == (uLength & 1));
 		u16* pWordData = (u16*)pCompareData;
 		const u32 uWordLength = (uLength + 1) >> 1;
 
@@ -393,6 +421,75 @@ bool FlashVerify(void* pCompareData, const u32 uAddress, const u32 uLength)
 	}
 
 	return true;
+}
+
+//------------------------------------------------------------------------------------------------
+//---- FlashIsErased                                                                          ----
+//------------------------------------------------------------------------------------------------
+bool FlashIsErased(const u32 uAddress, const u32 uLength)
+{
+    assert(s_flashROM.m_bInitialised);
+
+	if ((uAddress + uLength) > s_flashROM.m_uSize)
+		return false;
+
+	if (s_flashROM.m_u16Bit)
+	{
+	    assert(0 == uAddress & 1);
+	    assert(0 == uLength & 1);
+		const u32 uWordLength = (uLength + 1) >> 1;
+
+		for (u32 i=0; i<uWordLength; ++i)
+		{
+			if (0xFFFF != flash_read_word((uAddress >> 1) + i))
+				return false;
+		}
+
+		return true;
+	}
+
+	for (u32 i=0; i<uLength; ++i)
+	{
+		if (0xFF != flash_read_byte(uAddress + i))
+			return false;
+	}
+
+	return true;
+}
+
+//------------------------------------------------------------------------------------------------
+//---- FlashWrite                                                                             ----
+//------------------------------------------------------------------------------------------------
+bool FlashWrite(const void* pData, const u32 uAddress, const u32 uLength, const bool bVerify)
+{
+    assert(s_flashROM.m_bInitialised);
+
+	if ((uAddress + uLength) > s_flashROM.m_uSize)
+		return false;
+
+	if (!FlashIsErased(uAddress, uLength))
+		return false;
+
+	if (s_flashROM.m_u16Bit)
+	{
+	    assert(0 == (uAddress & 1));
+	    assert(0 == (uLength & 1));
+		u16* pWordData = (u16*)pData;
+		const u32 uWordLength = (uLength + 1) >> 1;
+
+		for (u32 i=0; i<uWordLength; ++i)
+			flash_write_word((uAddress >> 1) + i, swap_u16(pWordData[i]));
+	}
+	else
+	{
+		// TODO Add 8 Bit Write
+		return false;
+	}
+
+	if (!bVerify)
+        return true;
+
+    return FlashVerify(pData, uAddress, uLength);
 }
 
 //------------------------------------------------------------------------------------------------
@@ -508,8 +605,8 @@ int main()
 	if (FR_OK == fr)
 	{
 		FIL fil;
-		const char* const filename = "VicTestRom.bin";
-//		const char* const filename = "Kickstart_1_2.rom";
+//		const char* const filename = "VicTestRom.bin";
+		const char* const filename = "Kickstart_1_2.rom";
 
 		fr = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
 		if (FR_OK == fr)
@@ -522,13 +619,17 @@ int main()
 			while(bVerifySuccess)
 			{
 				f_read(&fil, (void*)&s_aReadBuffer, 1024, &uBytesRead);
+
 				if(0 == uBytesRead)
 					break;
 
-				if (!FlashVerify((void*)&s_aReadBuffer, uRomOffset, uBytesRead))
+				if (FlashIsErased(uRomOffset, uBytesRead))
 				{
-					bVerifySuccess = false;
-					break;
+					bVerifySuccess = FlashWrite((void*)&s_aReadBuffer, uRomOffset, uBytesRead, true);
+				}
+				else
+				{
+					bVerifySuccess = FlashVerify((void*)&s_aReadBuffer, uRomOffset, uBytesRead);
 				}
 
 				uRomOffset += uBytesRead;
@@ -536,11 +637,18 @@ int main()
 
 			if (bVerifySuccess)
 			{
-				DrawString(2, 2, "ROM Verify Success!!!", RGB_GREEN);
+				DrawString(2, 2, "Flash Verify Success!!!", RGB_GREEN);
 			}
 			else
 			{
-				DrawString(2, 2, "ROM Verify Failed!!!", RGB_RED);
+				if (FlashIsErased(0, uRomSize))
+				{
+					DrawString(2, 2, "Flash Empty!!!", RGB_MAGENTA);
+				}
+				else
+				{
+					DrawString(2, 2, "Flash Verify Failed!!!", RGB_RED);
+				}
 			}
 
 			f_close(&fil);
