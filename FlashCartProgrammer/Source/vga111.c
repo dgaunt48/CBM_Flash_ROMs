@@ -8,15 +8,10 @@
 #include "types.h"
 #include "pico/stdlib.h"
 
-// See FatFs - Generic FAT Filesystem Module, "Application Interface",
-// http://elm-chan.org/fsw/ff/00index_e.html
-#include "f_util.h"
-#include "ff.h"
-#include "hw_config.h"
+#include "vga111.h"
 
 #include "hardware/pio.h"
 #include "hardware/dma.h"
-#include "hardware/spi.h"
 
 #include "hsync.pio.h"
 #include "vsync.pio.h"
@@ -24,25 +19,14 @@
 
 #include "VicChars.h"
 
-#define VGA_RESOLUTION_X    	(640)
-#define VGA_RESOLUTION_Y  		(480)
-#define TERMINAL_CHARS_WIDE		(VGA_RESOLUTION_X >> 3)
-#define TERMINAL_CHARS_HIGH		(VGA_RESOLUTION_Y >> 3)
+const u8 g_aHexTable[16] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+u8 volatile aVGAScreenBuffer[(VGA_RESOLUTION_X * VGA_RESOLUTION_Y) >> 1];
+volatile u8* address_pointer = aVGAScreenBuffer;
 
-enum vga_pins {PIN_RED = 0, PIN_GREEN, PIN_BLUE, PIN_HSYNC = 4, PIN_VSYNC, PIN_IO0 = 12, PIN_DATA_OE = 32, PIN_LATCH_ADDRESS, PIN_LATCH_OE, PIN_BYTE = 36, PIN_WE, PIN_OE, PIN_CE};
-#define ADDRESS_BUS_SIZE		(20)
-
-enum rgbColours {RGB_BLACK, RGB_RED, RGB_GREEN, RGB_YELLOW, RGB_BLUE, RGB_MAGENTA, RGB_CYAN, RGB_WHITE};
-
-u8 aVGAScreenBuffer[(VGA_RESOLUTION_X * VGA_RESOLUTION_Y) >> 1];
-u8* address_pointer = aVGAScreenBuffer;
-
-static volatile u8 s_aReadBuffer[1024];
-
-//-----------------------------------------------------------------------------------------------'-
+//------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
-void initVGA()
+void initVGA(const u32 uPinRGB, const u32 uPinHSync, const u32 uPinVSync)
 {
 	// Choose which PIO instance to use (there are two instances, each with 4 state machines)
 	PIO pio = pio0;
@@ -54,9 +38,9 @@ void initVGA()
 	uint hsync_sm = 0;
 	uint vsync_sm = 1;
 	uint rgb_sm = 2;
-	hsync_program_init(pio, hsync_sm, hsync_offset, PIN_HSYNC);
-	vsync_program_init(pio, vsync_sm, vsync_offset, PIN_VSYNC);
-	rgb_program_init(pio, rgb_sm, rgb_offset, PIN_RED);
+	hsync_program_init(pio, hsync_sm, hsync_offset, uPinHSync);
+	vsync_program_init(pio, vsync_sm, vsync_offset, uPinVSync);
+	rgb_program_init(pio, rgb_sm, rgb_offset, uPinRGB);
 
 	/////////////////////////////////////////////////////////////////////////////////////////////////////
 	// ============================== PIO DMA Channels =================================================
@@ -157,14 +141,14 @@ void FilledRectangle(u32 uPositionX, u32 uPositionY, u32 uWidth, u32 uHeight, u3
 
 		while (uWidth > 1)
 		{
-		u32 uOffset = uPixelOffset++;
-		uWidth -= 2;
+			u32 uOffset = uPixelOffset++;
+			uWidth -= 2;
 
-		for(u32 y=0; y<uHeight; ++y)
-		{
-			aVGAScreenBuffer[uOffset] = (uColour << 3) | uColour;
-			uOffset += VGA_RESOLUTION_X >> 1;
-		}
+			for(u32 y=0; y<uHeight; ++y)
+			{
+				aVGAScreenBuffer[uOffset] = (uColour << 3) | uColour;
+				uOffset += VGA_RESOLUTION_X >> 1;
+			}
 		}
 
 		if (1 == uWidth)
@@ -207,7 +191,7 @@ void DrawPetsciiChar(const u32 uXPos, const u32 uYPos, const u8 uChar, const u8 
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
-void DrawString(uint32_t uCharX, uint32_t uCharY, const char* pszString, const uint8_t uColour)
+void DrawString(u32 uCharX, u32 uCharY, const char* pszString, const u8 uColour)
 {
 	while (*pszString)
 	{
@@ -220,240 +204,12 @@ void DrawString(uint32_t uCharX, uint32_t uCharY, const char* pszString, const u
 		if (uCharY >= (TERMINAL_CHARS_HIGH-1))
 			return;
 
-		uint8_t c = *pszString++;
+		u8 c = *pszString++;
 
 		if (c >= '`')
 			c -= '`';
 
 		DrawPetsciiChar(uCharX << 3, uCharY << 3, c, uColour);
 		++uCharX;
-	}
-}
-
-//------------------------------------------------------------------------------------------------
-//----                                                                                        ----
-//------------------------------------------------------------------------------------------------
-static const uint8_t aHexTable[16] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
-
-static inline uint16_t byteToHex(const uint8_t uByte)
-{
-  return (aHexTable[(uByte >> 4) & 15] << 8) | aHexTable[uByte & 15];
-}
-
-//------------------------------------------------------------------------------------------------
-//----                                                                                        ----
-//------------------------------------------------------------------------------------------------
-void FormatHexDumpLine(uint32_t uCharX, uint32_t uCharY, const uint32_t uAddress, const uint8_t* pLineBuffer, const uint8_t uColour)
-{
-	// Write Address Offset in 6 byte hex.
-	for(int i=5; i>=0; --i)
-		DrawPetsciiChar((uCharX + 5 - i) << 3, uCharY << 3, aHexTable[(uAddress >> (i << 2)) & 15], uColour);
-
-	// Write 16 bytes worth of hex values.
- 	for(uint32_t uIndex=0; uIndex<16; ++uIndex)
-	{
-    const uint16_t uHexPair = byteToHex(pLineBuffer[uIndex]);
-		DrawPetsciiChar((uCharX + 8 + (uIndex * 3)) << 3, uCharY << 3, uHexPair >> 8, uColour);
-		DrawPetsciiChar((uCharX + 9 + (uIndex * 3)) << 3, uCharY << 3, uHexPair & 255, uColour);
-
-		// Write ASCII version of byte.
-		DrawPetsciiChar((uCharX + 57 + uIndex) << 3, uCharY << 3, pLineBuffer[uIndex], uColour);
-	}
-}
-
-//------------------------------------------------------------------------------------------------
-//----                                                                                        ----
-//------------------------------------------------------------------------------------------------
-int main()
-{
-    stdio_init_all();
-
-	// Data Bus Off
-	gpio_init(PIN_DATA_OE);
-    gpio_set_dir(PIN_DATA_OE, GPIO_OUT);
-	gpio_put(PIN_DATA_OE, false);
-
-	// Address Latch Transparent
-	gpio_init(PIN_LATCH_ADDRESS);
-    gpio_set_dir(PIN_LATCH_ADDRESS, GPIO_OUT);
-	gpio_put(PIN_LATCH_ADDRESS, true);
-
-	// Address Output On
-	gpio_init(PIN_LATCH_OE);
-    gpio_set_dir(PIN_LATCH_OE, GPIO_OUT);
-	gpio_put(PIN_LATCH_OE, false);
-
-	// Word Mode (Only For 16 Bit Flash IC"s)
-	gpio_init(PIN_BYTE);
-    gpio_set_dir(PIN_BYTE, GPIO_OUT);
-	gpio_put(PIN_BYTE, true);
-
-	// Write Is Disabled
-	gpio_init(PIN_WE);
-    gpio_set_dir(PIN_WE, GPIO_OUT);
-	gpio_put(PIN_WE, true);
-
-	// Flash IC Output Is Enabled
-	gpio_init(PIN_OE);
-    gpio_set_dir(PIN_OE, GPIO_OUT);
-	gpio_put(PIN_OE, false);
-
-	// Flash IC Is Enabled (Only For 16 Bit IC Socket)
-	gpio_init(PIN_CE);
-    gpio_set_dir(PIN_CE, GPIO_OUT);
-	gpio_put(PIN_CE, false);
-
-	// Set All IO Lines To Output
-	for(u32 i=0; i<ADDRESS_BUS_SIZE; ++i)
-	{
-	    gpio_init(PIN_IO0 + i);
-	    gpio_set_dir(PIN_IO0 + i, GPIO_OUT);
-		gpio_put(PIN_IO0 + i, 0);
-	}
-
-    initVGA();
-	FilledRectangle(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB_GREEN);
-	FilledRectangle(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB_BLACK);
-
-	char szTempString[128];
-	sd_card_t *pSD = sd_get_by_num(0);
-
-	FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
-	if (FR_OK == fr)
-	{
-		FIL fil;
-		const char* const filename = "VicTestRom.bin";
-
-		fr = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
-		if (FR_OK == fr)
-		{
-			const u32 uRomSize = f_size(&fil);
-			u32 uRomOffset = 0;
-			u32 uBytesRead;
-			bool bVerifySuccess = true;
-
-			while(bVerifySuccess)
-			{
-				f_read(&fil, (void*)&s_aReadBuffer, 1024, &uBytesRead);
-				
-				if(uBytesRead > 0)
-				{
-					for(u32 i=0; i<uBytesRead; ++i)
-					{
-						// Diable Data Bus And Set Address
-						gpio_put(PIN_DATA_OE, false);
-						gpio_set_dir_out_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0);
-						gpio_put(PIN_LATCH_ADDRESS, true);
-						gpio_put_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0, (uRomOffset + i) << PIN_IO0);
-
-						// Latch Address Lines
-						delay_120ns();
-						gpio_put(PIN_LATCH_ADDRESS, false);
-
-						// Enable And Read The Data Bus
-						gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
-						gpio_put(PIN_DATA_OE, true);
-						delay_120ns();
-						delay_120ns();
-						delay_120ns();
-
-						const u8 uDataBus = (gpio_get_all() >> PIN_IO0) & 0xFF;
-						if (s_aReadBuffer[i] != uDataBus)
-						{
-							bVerifySuccess = false;
-							break;
-						}
-					}
-
-					uRomOffset += uBytesRead;
-				}
-				else
-				{
-					break;
-				}
-			}
-
-			if (bVerifySuccess)
-			{
-				DrawString(2, 2, "ROM Verify Success!!!", RGB_GREEN);
-			}
-			else
-			{
-				DrawString(2, 2, "ROM Verify Failed!!!", RGB_RED);
-			}
-
-			f_close(&fil);
-		}
-		else
-		{
-			sprintf(szTempString, "can't open file: %s", filename);
-		}
-
-	    f_unmount(pSD->pcName);
-	}
-	else
-	{
-		sprintf(szTempString, "f_mount error: %s (%d)", FRESULT_str(fr), fr);
-		DrawString(2, 2, szTempString, RGB_RED);
-	}
-
-    // FIL fil;
-    // const char* const filename = "filename.txt";
-    // fr = f_open(&fil, filename, FA_OPEN_APPEND | FA_WRITE);
-
-    // if (FR_OK != fr && FR_EXIST != fr)
-    //     panic("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
-
-    // if (f_printf(&fil, "Dave Waz Ere Again!!!\n") < 0)
-    //     printf("f_printf failed\n");
-
-    // fr = f_close(&fil);
-
-    // if (FR_OK != fr)
-    //     printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
-
-	u32 uOnTime = 0;
-	const u32 uFlashOffset = 0;
-
-	for (uint32_t uLine=0; uLine<40; ++uLine)
-	{
-		u8 aLineBuffer[16];
-		const u32 uAddress = uFlashOffset + (uLine << 4);
-
-		for (u32 i=0; i<16; ++i)
-		{
-			// Diable Data Bus And Set Address
-			gpio_put(PIN_DATA_OE, false);
-			gpio_set_dir_out_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0);
-			gpio_put(PIN_LATCH_ADDRESS, true);
-			gpio_put_masked(((1 << ADDRESS_BUS_SIZE) - 1) << PIN_IO0, (uAddress + i) << PIN_IO0);
-
-			// Latch Address Lines
-			delay_120ns();
-			gpio_put(PIN_LATCH_ADDRESS, false);
-
-			// Enable And Read The Data Bus
-			gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
-			gpio_put(PIN_DATA_OE, true);
-			delay_120ns();
-			delay_120ns();
-			delay_120ns();
-
-			aLineBuffer[i] = (gpio_get_all() >> PIN_IO0) & 0xFF;
-
-			// if (Vic8kCombo[uAddress + i] != aLineBuffer[i])
-			// 	aLineBuffer[i] = '*';
-		}
-
-//		SpiNorFlash_Read(uAddress, 16, aLineBuffer);
-		FormatHexDumpLine(3, 10 + uLine, uAddress, aLineBuffer, RGB_CYAN);
-	}
-
-	while(true)
-	{
-		sprintf(szTempString, "Time On = %d.%d", uOnTime / 50, (uOnTime % 50) * 2);
-		DrawString(2, 62, szTempString, RGB_YELLOW);
-		sleep_ms(16);
-		uOnTime++;
 	}
 }
