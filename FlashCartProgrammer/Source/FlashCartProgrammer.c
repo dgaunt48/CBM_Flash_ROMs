@@ -19,15 +19,17 @@
 enum flash_manufacturer
 {
 	FLASH_MANUFACTURER_UNKNOWN		= 0x00,
+	FLASH_MANUFACTURER_MICRON		= 0x01,
 	FLASH_MANUFACTURER_SST			= 0xBF,
 	FLASH_MANUFACTURER_MACRONIX		= 0xC2
 };
 
 enum flash_boot_sector
 {
-	FLASH_BOOT_SECTOR_NONE = 0,
-	FLASH_BOOT_SECTOR_TOP,
-	FLASH_BOOT_SECTOR_BOTTOM
+	FLASH_SECTOR_NONE = 0,
+	FLASH_SECTOR_4K,
+	FLASH_SECTOR_64K_TOP_BOOT,
+	FLASH_SECTOR_64K_BOTTOM_BOOT
 };
 
 enum flash_voltage
@@ -49,7 +51,6 @@ typedef struct
 	u8		m_uNumSectors;
 
 	u32		m_uSize;
-	u16		m_aSectorBase4k[256+1];
 } flashROM;
 
 enum mcu_pins
@@ -294,11 +295,85 @@ bool FlashInitialise(void)
 		return false;
 
 	flash_software_id_entry();
-	sleep_ms(16);                        // Give the IC time to exit standby mode.
+	sleep_ms(16);				// Give the IC time to exit standby mode.
 
 	s_flashROM.m_eManufacturer = flash_read_byte(0);
 	switch(s_flashROM.m_eManufacturer)
 	{
+		case FLASH_MANUFACTURER_MICRON:
+		{
+			const u16 uFlashType = swap_u16(flash_read_word(1));
+			switch (uFlashType)
+			{
+				case 0x2251:	// M29F200FT - 2 Mbit
+				{
+					s_flashROM.m_eBootSector = FLASH_SECTOR_64K_TOP_BOOT;
+					s_flashROM.m_uNumSectors = 4;
+				}
+				break;
+
+				case 0x2223:	// M29F400FT - 4 Mbit
+				{
+					s_flashROM.m_eBootSector = FLASH_SECTOR_64K_TOP_BOOT;
+					s_flashROM.m_uNumSectors = 8;
+				}
+				break;
+
+				case 0x22D6:	// M29F800FT - 8 Mbit
+				{
+					s_flashROM.m_eBootSector = FLASH_SECTOR_64K_TOP_BOOT;
+					s_flashROM.m_uNumSectors = 16;
+				}
+				break;
+
+				case 0x22D2:	// M29F160FT - 16 Mbit
+				{
+					s_flashROM.m_eBootSector = FLASH_SECTOR_64K_TOP_BOOT;
+					s_flashROM.m_uNumSectors = 32;
+				}
+				break;
+
+				case 0x2257:	// M29F200FB - 2 Mbit
+				{
+					s_flashROM.m_eBootSector = FLASH_SECTOR_64K_BOTTOM_BOOT;
+					s_flashROM.m_uNumSectors = 4;
+				}
+				break;
+
+				case 0x22AB:	// M29F400FB - 4 Mbit
+				{
+					s_flashROM.m_eBootSector = FLASH_SECTOR_64K_BOTTOM_BOOT;
+					s_flashROM.m_uNumSectors = 8;
+				}
+				break;
+
+				case 0x2258:	// M29F800FB - 8 Mbit
+				{
+					s_flashROM.m_eBootSector = FLASH_SECTOR_64K_BOTTOM_BOOT;
+					s_flashROM.m_uNumSectors = 16;
+				}
+				break;
+
+				case 0x22D8:	// M29F160FB - 16 Mbit
+				{
+					s_flashROM.m_eBootSector = FLASH_SECTOR_64K_BOTTOM_BOOT;
+					s_flashROM.m_uNumSectors = 32;
+				}
+				break;
+
+				default:
+					return (false);
+			}
+
+			s_flashROM.m_uSize = s_flashROM.m_uNumSectors << 16;
+			s_flashROM.m_eVoltage = FLASH_VOLTAGE_5V0;
+			s_flashROM.m_uSoftwareIdExit = true;
+			s_flashROM.m_u16Bit = true;
+
+			s_flashROM.m_bInitialised = true;
+		}
+		break;
+
 		case FLASH_MANUFACTURER_SST:
 		{
 	 		const u8 uFlashID = flash_read_byte(1);
@@ -319,55 +394,33 @@ bool FlashInitialise(void)
 			if ( ((uFlashID & 15) < 4) || ((uFlashID & 15) > 7) )
 				return (false);
 
-			s_flashROM.m_eBootSector = FLASH_BOOT_SECTOR_NONE;
-			s_flashROM.m_uSoftwareIdExit = true;
-			s_flashROM.m_u16Bit = false;
-
-			// Simple Linear Flash, 4k Sector Base Is Just The Sector Index.
+			s_flashROM.m_eBootSector = FLASH_SECTOR_4K;
 			const u32 uNumSectors = 1 << (uFlashID & 15);
-			for (u32 uSectorIndex=0; uSectorIndex<uNumSectors+1; ++uSectorIndex)
-				s_flashROM.m_aSectorBase4k[uSectorIndex] = uSectorIndex;
-
 			s_flashROM.m_uNumSectors = uNumSectors;
 			s_flashROM.m_uSize = uNumSectors << 12;
+
+			s_flashROM.m_u16Bit = false;
+			s_flashROM.m_uSoftwareIdExit = true;
 			s_flashROM.m_bInitialised = true;
 		}
 		break;
 
 		case FLASH_MANUFACTURER_MACRONIX:
 		{
-			s_flashROM.m_eVoltage = FLASH_VOLTAGE_5V0;
-			s_flashROM.m_u16Bit = true;
-			s_flashROM.m_uSoftwareIdExit = false;
-				
 			const u16 uFlashType = swap_u16(flash_read_word(1));
 			switch (uFlashType)
 			{
-				case 0x2251:
+				case 0x2251:	// MX29F200CT - 2 Mbit
 				{
-					s_flashROM.m_eBootSector = FLASH_BOOT_SECTOR_TOP;
-					s_flashROM.m_aSectorBase4k[0] = 0;		// 64k
-					s_flashROM.m_aSectorBase4k[1] = 16;		// 64k
-					s_flashROM.m_aSectorBase4k[2] = 32;		// 64k
-					s_flashROM.m_aSectorBase4k[3] = 48;		// 32k
-					s_flashROM.m_aSectorBase4k[4] = 56;		// 8k
-					s_flashROM.m_aSectorBase4k[5] = 58;		// 8k
-					s_flashROM.m_aSectorBase4k[6] = 60;		// 16k
-					s_flashROM.m_aSectorBase4k[7] = 64;		// End
+					s_flashROM.m_eBootSector = FLASH_SECTOR_64K_TOP_BOOT;
+					s_flashROM.m_uNumSectors = 4;
 				}					
 				break;
 
-				case 0x2257:
+				case 0x2257:	// MX29F200CB - 2 Mbit
 				{
-					s_flashROM.m_eBootSector = FLASH_BOOT_SECTOR_BOTTOM;
-					s_flashROM.m_aSectorBase4k[0] = 0;		// 16k
-					s_flashROM.m_aSectorBase4k[1] = 4;		// 8k
-					s_flashROM.m_aSectorBase4k[2] = 6;		// 8k
-					s_flashROM.m_aSectorBase4k[3] = 8;		// 32k
-					s_flashROM.m_aSectorBase4k[4] = 16;		// 64k
-					s_flashROM.m_aSectorBase4k[5] = 32;		// 64k
-					s_flashROM.m_aSectorBase4k[6] = 48;		// 64k
-					s_flashROM.m_aSectorBase4k[7] = 64;		// End
+					s_flashROM.m_eBootSector = FLASH_SECTOR_64K_BOTTOM_BOOT;
+					s_flashROM.m_uNumSectors = 4;
 				}
 				break;
 
@@ -375,8 +428,11 @@ bool FlashInitialise(void)
 					return (false);
 			}
 
-			s_flashROM.m_uNumSectors = 7;
-			s_flashROM.m_uSize = 256 << 10;
+			s_flashROM.m_uSize = s_flashROM.m_uNumSectors << 16;
+			s_flashROM.m_eVoltage = FLASH_VOLTAGE_5V0;
+			s_flashROM.m_uSoftwareIdExit = false;
+			s_flashROM.m_u16Bit = true;
+
 			s_flashROM.m_bInitialised = true;
 		}
 		break;
@@ -461,30 +517,131 @@ bool FlashVerify(const void* pCompareData, const u32 uAddress, const u32 uLength
 //------------------------------------------------------------------------------------------------
 //---- FlashGetSectorBase                                                                     ----
 //------------------------------------------------------------------------------------------------
+static const u32 s_uBottomBoot64kOffset[8] =
+{
+	0,				// 16k Block
+	0,
+	16384,			// 8k  Block
+	24576,			// 8k  Block
+	32768,			// 32k Block
+	32768,
+	32768,
+	32768
+};
+
+static const u32 s_uTopBoot64kOffset[8] =
+{
+	0,				// 32k Block
+	0,
+	0,
+	0,
+	32768,			// 8k Block
+	40960,			// 8k Block
+	49152,			// 16k Block
+	49152
+};
+
 u32 FlashGetSectorBase(const u32 uAddress)
 {
     assert(s_flashROM.m_bInitialised);
 	assert(uAddress < s_flashROM.m_uSize);
-	u32 uSectorIndex = s_flashROM.m_uNumSectors;
 
-	while((s_flashROM.m_aSectorBase4k[uSectorIndex] << 12) > uAddress)
-		--uSectorIndex;
+	switch (s_flashROM.m_eBootSector)
+	{
+		case FLASH_SECTOR_4K:
+			return (uAddress >> 12);
 
-	return (s_flashROM.m_aSectorBase4k[uSectorIndex] << 12);
+		case FLASH_SECTOR_64K_TOP_BOOT:
+		{
+			u32 uSector = uAddress >> 16;
+
+			if (uSector < s_flashROM.m_uNumSectors - 1)
+				return uAddress & 0xFFFF0000;
+			
+			// Else we are in the top sector....
+			const u32 u8kOffset = (uAddress >> 13) & 7;		// Divide By 8k
+			return (uAddress & 0xFFFF0000) + s_uTopBoot64kOffset[u8kOffset];
+		}
+
+		case FLASH_SECTOR_64K_BOTTOM_BOOT:
+		{
+			u32 uSector = uAddress >> 16;
+
+			if (uSector > 0)
+				return uAddress & 0xFFFF0000;
+
+			// Else we are in the bottom sector....
+			const u32 u8kOffset = (uAddress >> 13) & 7;		// Divide By 8k
+			return (s_uBottomBoot64kOffset[u8kOffset]);
+		}
+	}
+
+	return 0;
 }
 
 //------------------------------------------------------------------------------------------------
 //---- FlashGetSectorLength                                                                   ----
 //------------------------------------------------------------------------------------------------
+static const u32 s_uBottomBoot64kLength[8] =
+{
+	16384,			// 16k Block
+	16384,
+	8192,			// 8k  Block
+	8192,			// 8k  Block
+	32768,			// 32k Block
+	32768,
+	32768,
+	32768
+};
+
+static const u32 s_uTopBoot64kLength[8] =
+{
+	32768,			// 32k Block
+	32768,
+	32768,
+	32768,
+	8192,			// 8k  Block
+	8192,			// 8k  Block
+	16384,			// 16k Block
+	16384
+};
+
 u32 FlashGetSectorLength(const u32 uAddress)
 {
     assert(s_flashROM.m_bInitialised);
 	assert(uAddress < s_flashROM.m_uSize);
-	u32 uSectorIndex = s_flashROM.m_uNumSectors;
-	while((s_flashROM.m_aSectorBase4k[uSectorIndex] << 12) > uAddress)
-		--uSectorIndex;
 
-	return ((s_flashROM.m_aSectorBase4k[uSectorIndex + 1] - s_flashROM.m_aSectorBase4k[uSectorIndex]) << 12);
+	switch (s_flashROM.m_eBootSector)
+	{
+		case FLASH_SECTOR_4K:
+			return (4096);
+
+		case FLASH_SECTOR_64K_TOP_BOOT:
+		{
+			u32 uSector = uAddress >> 16;
+
+			if (uSector < s_flashROM.m_uNumSectors - 1)
+				return 65536;
+			
+			// Else we are in the top sector....
+			const u32 u8kOffset = (uAddress >> 13) & 7;		// Divide By 8k
+			return s_uTopBoot64kLength[u8kOffset];
+		}
+
+		case FLASH_SECTOR_64K_BOTTOM_BOOT:
+		{
+			u32 uSector = uAddress >> 16;
+
+			if (uSector > 0)
+				return 65536;
+
+			// Else we are in the bottom sector....
+			const u32 u8kOffset = (uAddress >> 13) & 7;		// Divide By 8k
+			return s_uBottomBoot64kLength[u8kOffset];
+		}
+	}
+
+	return s_flashROM.m_uSize;
 }
 
 //------------------------------------------------------------------------------------------------
@@ -499,8 +656,8 @@ bool FlashIsErased(const u32 uAddress, const u32 uLength)
 
 	if (s_flashROM.m_u16Bit)
 	{
-	    assert(0 == uAddress & 1);
-	    assert(0 == uLength & 1);
+	    assert(0 == (uAddress & 1));
+	    assert(0 == (uLength & 1));
 		const u32 uWordLength = (uLength + 1) >> 1;
 
 		for (u32 i=0; i<uWordLength; ++i)
@@ -535,7 +692,15 @@ bool FlashEraseSector(const u32 uAddress, const bool bVerify)
 	{
 		flash_command_mode_write();
 		flash_command_sequence(0x5555, 0x80);
-		flash_command_sequence(uAddress, 0x30);
+
+		if (s_flashROM.m_u16Bit)
+		{
+			flash_command_sequence(uAddress >> 1, 0x30);
+		}
+		else
+		{
+			flash_command_sequence(uAddress, 0x30);
+		}
 
 		busy_wait_at_least_cycles(15);
 		flash_command_mode_read();
@@ -683,17 +848,20 @@ int main()
 		// Can't Initialise Flash So Take A Guess That A Mask ROM Is Inserted.
 		s_flashROM.m_eManufacturer = FLASH_MANUFACTURER_UNKNOWN;
 		s_flashROM.m_eVoltage = FLASH_VOLTAGE_5V0;
-		s_flashROM.m_eBootSector = FLASH_BOOT_SECTOR_NONE;
+		s_flashROM.m_eBootSector = FLASH_SECTOR_NONE;
 		s_flashROM.m_u16Bit = true;
 		s_flashROM.m_uSoftwareIdExit = false;
-		s_flashROM.m_uNumSectors = 0;
+		s_flashROM.m_uNumSectors = 1;
 		s_flashROM.m_uSize = 256 << 10;
-		s_flashROM.m_aSectorBase4k[0] = s_flashROM.m_uSize >> 2;
 		s_flashROM.m_bInitialised = true;
 	}
 
 	switch (s_flashROM.m_eManufacturer)
 	{
+		case FLASH_MANUFACTURER_MICRON:
+			DrawString(2, 52, "Flash Manufacturer MICRON", RGB_GREEN);
+		break;
+
 		case FLASH_MANUFACTURER_SST:
 			DrawString(2, 52, "Flash Manufacturer SST", RGB_GREEN);
 		break;
@@ -712,12 +880,16 @@ int main()
 
 	switch (s_flashROM.m_eBootSector)
 	{
-		case FLASH_BOOT_SECTOR_TOP:
-			DrawString(2, 54, "Boot Sector Top", RGB_GREEN);
+		case FLASH_SECTOR_4K:
+			DrawString(2, 54, "4k Sectors", RGB_GREEN);
 		break;
 
-		case FLASH_BOOT_SECTOR_BOTTOM:
-			DrawString(2, 54, "Boot Sector Bottom", RGB_GREEN);
+		case FLASH_SECTOR_64K_TOP_BOOT:
+			DrawString(2, 54, "64k Sector Top Boot", RGB_GREEN);
+		break;
+
+		case FLASH_SECTOR_64K_BOTTOM_BOOT:
+			DrawString(2, 54, "64k Sector Bottom Boot", RGB_GREEN);
 		break;
 
 		default:
@@ -726,7 +898,7 @@ int main()
 	}
 
 	sprintf(szTempString, "Sector Count = %d   Size = %d KBytes", s_flashROM.m_uNumSectors, s_flashROM.m_uSize >> 10);
-	DrawString(22, 54, szTempString, RGB_GREEN);
+	DrawString(27, 54, szTempString, RGB_GREEN);
 
 	sd_card_t *pSD = sd_get_by_num(0);
 
@@ -734,9 +906,11 @@ int main()
 	if (FR_OK == fr)
 	{
 		FIL fil;
-		const char* const filename = "VicTestRom.bin";
+//		const char* const filename = "VicTestRom.bin";
 //		const char* const filename = "Kickstart_1_2.rom";
-//		FlashEraseSector(5000);
+		const char* const filename = "Kickstart_2_04.rom";
+//		FlashEraseSector(150000, false);
+//		FlashErase(false);
 
 		fr = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
 		if (FR_OK == fr)
@@ -745,6 +919,10 @@ int main()
 			bool bVerifySuccess = true;
 			u32 uRomOffset = 0;
 			u32 uBytesRead;
+
+			// s_uTest = FlashGetSectorBase(80000);
+			// s_uTest = FlashGetSectorBase(2097152 - 1000);
+			// s_uTest = FlashGetSectorLength(80000);
 
 			while(bVerifySuccess)
 			{
@@ -755,7 +933,10 @@ int main()
 
 				if (FlashIsErased(uRomOffset, uBytesRead))
 				{
-					bVerifySuccess = FlashWrite((void*)&s_aReadBuffer, uRomOffset, uBytesRead, true);
+					// As the IO buffer is only 1k in size occasionally 1024 255's is the valid data!!!
+					// Kickstart 2.04 I'm looking at you!!!
+					if( !FlashVerify((void*)&s_aReadBuffer, uRomOffset, uBytesRead) )
+						bVerifySuccess = FlashWrite((void*)&s_aReadBuffer, uRomOffset, uBytesRead, true);
 				}
 				else
 				{
@@ -811,7 +992,7 @@ int main()
     // if (FR_OK != fr)
     //     printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
 
-	const u32 uFlashOffset = 4090;
+	const u32 uFlashOffset = 0;
 	for (u32 uLine=0; uLine<40; ++uLine)
 	{
 		u8 aLineBuffer[16];
