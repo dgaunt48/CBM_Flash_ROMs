@@ -1,7 +1,8 @@
 //------------------------------------------------------------------------------------------------
-//----                                                                                        ----
+//---- CBM Flash Cart Programmer                                                              ----
 //------------------------------------------------------------------------------------------------
-//----                                                                                        ----
+//---- v1.0 - 2022 Dave Gaunt                                                                 ----
+//---- v2.0 - 2026 Complete Rewrite                                                           ----
 //------------------------------------------------------------------------------------------------
 
 #include <stdio.h>
@@ -41,23 +42,15 @@ typedef struct
 	u8		m_eManufacturer;
 	u8		m_eVoltage;
 	u8		m_eBootSector;
+
 	u8		m_u16Bit;
 	u8		m_uSoftwareIdExit;
 	u8		m_uPadding;
 	u8		m_uNumSectors;
+
 	u32		m_uSize;
+	u16		m_aSectorBase4k[256+1];
 } flashROM;
-
-
-// #define SST39SF0_SIZE_128K (0xB5)       /* 1024 Mb ... 128k x 8 */
-// #define SST39SF0_SIZE_256K (0xB6)       /* 2048 Mb ... 256k x 8 */
-// #define SST39SF0_SIZE_512K (0xB7)       /* 4096 Mb ... 512k x 8 */
-// #define SST39SF0_PAGE_SHIFT (8)
-// #define SST39SF0_SECTOR_SHIFT (12)
-// #define SST39SF0_PAGE_SIZE (1 << SST39SF0_PAGE_SHIFT)
-// #define SST39SF0_SECTOR_SIZE (1 << SST39SF0_SECTOR_SHIFT)
-// #define SST39SF0_PAGES_PER_SECTOR (1 << (SST39SF0_SECTOR_SHIFT - SST39SF0_PAGE_SHIFT))
-// #define SST39SF0_ERASED_VALUE (0xFF)
 
 enum mcu_pins
 {
@@ -219,6 +212,22 @@ u16 flash_read_word(const u32 uAddress)
 }
 
 //------------------------------------------------------------------------------------------------
+//---- flash_write_byte                                                                       ----
+//------------------------------------------------------------------------------------------------
+void flash_write_byte(const u32 uAddress, const u8 uData)
+{
+	flash_command_mode_write();
+	flash_command_sequence(0x5555, 0xA0);
+	flash_command_word(uAddress, uData);
+	flash_command_mode_read();
+	gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
+	do
+	{
+		busy_wait_at_least_cycles(9);
+	} while ( ((gpio_get_all() >> PIN_IO0) & 0x80) != (uData & 0x80));
+}
+
+//------------------------------------------------------------------------------------------------
 //---- flash_write_word                                                                       ----
 //------------------------------------------------------------------------------------------------
 void flash_write_word(const u32 uAddress, const u16 uData)
@@ -311,10 +320,16 @@ bool FlashInitialise(void)
 				return (false);
 
 			s_flashROM.m_eBootSector = FLASH_BOOT_SECTOR_NONE;
-			s_flashROM.m_u16Bit = false;
 			s_flashROM.m_uSoftwareIdExit = true;
-			s_flashROM.m_uNumSectors = 1 << (uFlashID & 15);
-			s_flashROM.m_uSize = s_flashROM.m_uNumSectors << 12;
+			s_flashROM.m_u16Bit = false;
+
+			// Simple Linear Flash, 4k Sector Base Is Just The Sector Index.
+			const u32 uNumSectors = 1 << (uFlashID & 15);
+			for (u32 uSectorIndex=0; uSectorIndex<uNumSectors+1; ++uSectorIndex)
+				s_flashROM.m_aSectorBase4k[uSectorIndex] = uSectorIndex;
+
+			s_flashROM.m_uNumSectors = uNumSectors;
+			s_flashROM.m_uSize = uNumSectors << 12;
 			s_flashROM.m_bInitialised = true;
 		}
 		break;
@@ -329,11 +344,31 @@ bool FlashInitialise(void)
 			switch (uFlashType)
 			{
 				case 0x2251:
+				{
 					s_flashROM.m_eBootSector = FLASH_BOOT_SECTOR_TOP;
+					s_flashROM.m_aSectorBase4k[0] = 0;		// 64k
+					s_flashROM.m_aSectorBase4k[1] = 16;		// 64k
+					s_flashROM.m_aSectorBase4k[2] = 32;		// 64k
+					s_flashROM.m_aSectorBase4k[3] = 48;		// 32k
+					s_flashROM.m_aSectorBase4k[4] = 56;		// 8k
+					s_flashROM.m_aSectorBase4k[5] = 58;		// 8k
+					s_flashROM.m_aSectorBase4k[6] = 60;		// 16k
+					s_flashROM.m_aSectorBase4k[7] = 64;		// End
+				}					
 				break;
 
 				case 0x2257:
+				{
 					s_flashROM.m_eBootSector = FLASH_BOOT_SECTOR_BOTTOM;
+					s_flashROM.m_aSectorBase4k[0] = 0;		// 16k
+					s_flashROM.m_aSectorBase4k[1] = 4;		// 8k
+					s_flashROM.m_aSectorBase4k[2] = 6;		// 8k
+					s_flashROM.m_aSectorBase4k[3] = 8;		// 32k
+					s_flashROM.m_aSectorBase4k[4] = 16;		// 64k
+					s_flashROM.m_aSectorBase4k[5] = 32;		// 64k
+					s_flashROM.m_aSectorBase4k[6] = 48;		// 64k
+					s_flashROM.m_aSectorBase4k[7] = 64;		// End
+				}
 				break;
 
 				default:
@@ -424,6 +459,35 @@ bool FlashVerify(const void* pCompareData, const u32 uAddress, const u32 uLength
 }
 
 //------------------------------------------------------------------------------------------------
+//---- FlashGetSectorBase                                                                     ----
+//------------------------------------------------------------------------------------------------
+u32 FlashGetSectorBase(const u32 uAddress)
+{
+    assert(s_flashROM.m_bInitialised);
+	assert(uAddress < s_flashROM.m_uSize);
+	u32 uSectorIndex = s_flashROM.m_uNumSectors;
+
+	while((s_flashROM.m_aSectorBase4k[uSectorIndex] << 12) > uAddress)
+		--uSectorIndex;
+
+	return (s_flashROM.m_aSectorBase4k[uSectorIndex] << 12);
+}
+
+//------------------------------------------------------------------------------------------------
+//---- FlashGetSectorLength                                                                   ----
+//------------------------------------------------------------------------------------------------
+u32 FlashGetSectorLength(const u32 uAddress)
+{
+    assert(s_flashROM.m_bInitialised);
+	assert(uAddress < s_flashROM.m_uSize);
+	u32 uSectorIndex = s_flashROM.m_uNumSectors;
+	while((s_flashROM.m_aSectorBase4k[uSectorIndex] << 12) > uAddress)
+		--uSectorIndex;
+
+	return ((s_flashROM.m_aSectorBase4k[uSectorIndex + 1] - s_flashROM.m_aSectorBase4k[uSectorIndex]) << 12);
+}
+
+//------------------------------------------------------------------------------------------------
 //---- FlashIsErased                                                                          ----
 //------------------------------------------------------------------------------------------------
 bool FlashIsErased(const u32 uAddress, const u32 uLength)
@@ -458,6 +522,34 @@ bool FlashIsErased(const u32 uAddress, const u32 uLength)
 }
 
 //------------------------------------------------------------------------------------------------
+//---- FlashEraseSector                                                                       ----
+//------------------------------------------------------------------------------------------------
+bool FlashEraseSector(const u32 uAddress)
+{
+    assert(s_flashROM.m_bInitialised);
+	const u32 uSectorAddress = FlashGetSectorBase(uAddress);
+	const u32 uLength = FlashGetSectorLength(uSectorAddress);
+
+	if (!FlashIsErased(uSectorAddress, uLength))
+	{
+		flash_command_mode_write();
+		flash_command_sequence(0x5555, 0x80);
+		flash_command_sequence(uAddress, 0x30);
+
+		busy_wait_at_least_cycles(15);
+		flash_command_mode_read();
+		gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
+
+		do
+		{
+			busy_wait_at_least_cycles(9);
+		} while ( 0 == ((gpio_get_all() >> PIN_IO0) & 0x80) );
+	}
+
+    return true;
+}
+
+//------------------------------------------------------------------------------------------------
 //---- FlashWrite                                                                             ----
 //------------------------------------------------------------------------------------------------
 bool FlashWrite(const void* pData, const u32 uAddress, const u32 uLength, const bool bVerify)
@@ -482,8 +574,10 @@ bool FlashWrite(const void* pData, const u32 uAddress, const u32 uLength, const 
 	}
 	else
 	{
-		// TODO Add 8 Bit Write
-		return false;
+		u8* pByteData = (u8*)pData;
+		
+		for (u32 i=0; i<uLength; ++i)
+			flash_write_byte(uAddress + i, pByteData[i]);
 	}
 
 	if (!bVerify)
@@ -560,6 +654,7 @@ int main()
 		s_flashROM.m_uSoftwareIdExit = false;
 		s_flashROM.m_uNumSectors = 0;
 		s_flashROM.m_uSize = 256 << 10;
+		s_flashROM.m_aSectorBase4k[0] = s_flashROM.m_uSize >> 2;
 		s_flashROM.m_bInitialised = true;
 	}
 
@@ -605,16 +700,17 @@ int main()
 	if (FR_OK == fr)
 	{
 		FIL fil;
-//		const char* const filename = "VicTestRom.bin";
-		const char* const filename = "Kickstart_1_2.rom";
+		const char* const filename = "VicTestRom.bin";
+//		const char* const filename = "Kickstart_1_2.rom";
+//		FlashEraseSector(5000);
 
 		fr = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
 		if (FR_OK == fr)
 		{
 			const u32 uRomSize = f_size(&fil);
+			bool bVerifySuccess = true;
 			u32 uRomOffset = 0;
 			u32 uBytesRead;
-			bool bVerifySuccess = true;
 
 			while(bVerifySuccess)
 			{
@@ -681,7 +777,7 @@ int main()
     // if (FR_OK != fr)
     //     printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
 
-	const u32 uFlashOffset = 0;
+	const u32 uFlashOffset = 4090;
 	for (u32 uLine=0; uLine<40; ++uLine)
 	{
 		u8 aLineBuffer[16];
