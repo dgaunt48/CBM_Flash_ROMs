@@ -488,7 +488,7 @@ u32 FlashGetSectorLength(const u32 uAddress)
 }
 
 //------------------------------------------------------------------------------------------------
-//---- FlashIsErased                                                                          ----
+//---- FlashIsErased - Check if the specified range is erased                                 ----
 //------------------------------------------------------------------------------------------------
 bool FlashIsErased(const u32 uAddress, const u32 uLength)
 {
@@ -522,13 +522,14 @@ bool FlashIsErased(const u32 uAddress, const u32 uLength)
 }
 
 //------------------------------------------------------------------------------------------------
-//---- FlashEraseSector                                                                       ----
+//---- FlashEraseSector - Erase the sector that uAddress is within                            ----
 //------------------------------------------------------------------------------------------------
-bool FlashEraseSector(const u32 uAddress)
+bool FlashEraseSector(const u32 uAddress, const bool bVerify)
 {
     assert(s_flashROM.m_bInitialised);
 	const u32 uSectorAddress = FlashGetSectorBase(uAddress);
 	const u32 uLength = FlashGetSectorLength(uSectorAddress);
+	bool bSuccess = true;
 
 	if (!FlashIsErased(uSectorAddress, uLength))
 	{
@@ -546,7 +547,40 @@ bool FlashEraseSector(const u32 uAddress)
 		} while ( 0 == ((gpio_get_all() >> PIN_IO0) & 0x80) );
 	}
 
-    return true;
+	if (bVerify)
+		bSuccess = FlashIsErased(uSectorAddress, uLength);
+
+    return bSuccess;
+}
+
+//------------------------------------------------------------------------------------------------
+//---- FlashErase - Erase the entire I.C.                                                     ----
+//------------------------------------------------------------------------------------------------
+bool FlashErase(const bool bVerify)
+{
+    assert(s_flashROM.m_bInitialised);
+	bool bSuccess = true;
+
+	if (!FlashIsErased(0, s_flashROM.m_uSize))
+	{
+		flash_command_mode_write();
+		flash_command_sequence(0x5555, 0x80);
+		flash_command_sequence(0x5555, 0x10);
+
+		busy_wait_at_least_cycles(15);
+		flash_command_mode_read();
+		gpio_set_dir_in_masked(((1 << 16) - 1) << PIN_IO0);
+
+		do
+		{
+			busy_wait_at_least_cycles(9);
+		} while ( 0 == ((gpio_get_all() >> PIN_IO0) & 0x80) );
+	}
+
+	if (bVerify)
+		bSuccess = FlashIsErased(0, s_flashROM.m_uSize);
+
+	return bSuccess;
 }
 
 //------------------------------------------------------------------------------------------------
