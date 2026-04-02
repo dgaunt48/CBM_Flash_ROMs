@@ -28,6 +28,8 @@ set(PICO_BOARD pico2 CACHE STRING "Board type")
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
 
+set(COMMON_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../RP2350/Common")
+
 project(FlashCartProgrammer C CXX ASM)
 
 # Initialise the Raspberry Pi Pico SDK
@@ -35,31 +37,39 @@ pico_sdk_init()
 
 add_subdirectory(../FatFs_SPI build)
 # Add executable. Default name is the project name, version 0.1
-add_executable(
-    FlashCartProgrammer
+add_executable(FlashCartProgrammer
     FlashCartProgrammer.c
     hw_config.c
-    vga111.c
-    VicChars.c
-    )
+    ${COMMON_DIR}/vga111.c
+    ${COMMON_DIR}/VicChars.c
+)
 
 # Generate PIO header
-pico_generate_pio_header(FlashCartProgrammer ${CMAKE_CURRENT_LIST_DIR}/hsync.pio)
-pico_generate_pio_header(FlashCartProgrammer ${CMAKE_CURRENT_LIST_DIR}/vsync.pio)
-pico_generate_pio_header(FlashCartProgrammer ${CMAKE_CURRENT_LIST_DIR}/rgb.pio)
+pico_generate_pio_header(FlashCartProgrammer ${COMMON_DIR}/hsync.pio)
+pico_generate_pio_header(FlashCartProgrammer ${COMMON_DIR}/vsync.pio)
+pico_generate_pio_header(FlashCartProgrammer ${COMMON_DIR}/rgb.pio)
 
 # Modify the below lines to enable/disable output over UART/USB
 pico_enable_stdio_uart(FlashCartProgrammer 0)
 pico_enable_stdio_usb(FlashCartProgrammer 0)
 
+# Add the standard library to the build
+target_link_libraries(FlashCartProgrammer pico_stdlib)
+
+# Add the standard include files to the build
+target_include_directories(FlashCartProgrammer PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}
+    ${COMMON_DIR}
+    ${CMAKE_CURRENT_LIST_DIR}/.. # for our common lwipopts or any other standard includes, if required
+)
+
 # pull in common dependencies
-target_link_libraries(
-    FlashCartProgrammer
+target_link_libraries(FlashCartProgrammer
     hardware_spi
     hardware_dma
     hardware_pio
     FatFs_SPI
-    )
+)
 
 # create map/bin/hex file etc.
 pico_add_extra_outputs(FlashCartProgrammer)
