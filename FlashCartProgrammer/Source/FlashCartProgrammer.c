@@ -106,18 +106,18 @@ void FormatHexDumpLine(u32 uCharX, u32 uCharY, const u32 uAddress, const u8* pLi
 {
 	// Write Address Offset in 6 byte hex.
 	for(int i=5; i>=0; --i)
-		DrawPetsciiChar((uCharX + 5 - i) << 3, uCharY << 3, g_aHexTable[(uAddress >> (i << 2)) & 15], uColour);
+		vga_DrawPetsciiChar((uCharX + 5 - i) << 3, uCharY << 3, g_aHexTable[(uAddress >> (i << 2)) & 15], uColour);
 
 	// Write 16 bytes worth of hex values.
  	for(u32 uIndex=0; uIndex<16; ++uIndex)
 	{
     	const u16 uHexPair = byteToHex(pLineBuffer[uIndex]);
-		DrawPetsciiChar((uCharX + 8 + (uIndex * 3)) << 3, uCharY << 3, uHexPair >> 8, uColour);
-		DrawPetsciiChar((uCharX + 9 + (uIndex * 3)) << 3, uCharY << 3, uHexPair & 255, uColour);
+		vga_DrawPetsciiChar((uCharX + 8 + (uIndex * 3)) << 3, uCharY << 3, uHexPair >> 8, uColour);
+		vga_DrawPetsciiChar((uCharX + 9 + (uIndex * 3)) << 3, uCharY << 3, uHexPair & 255, uColour);
 
 		// Write ASCII or PETSCII version of byte.
 		const u8 uCurrentChar = (bASCII) ? ascii_to_petscii(pLineBuffer[uIndex]) : pLineBuffer[uIndex];
-		DrawPetsciiChar((uCharX + 57 + uIndex) << 3, uCharY << 3, uCurrentChar, uColour);
+		vga_DrawPetsciiChar((uCharX + 57 + uIndex) << 3, uCharY << 3, uCurrentChar, uColour);
 	}
 }
 
@@ -788,6 +788,58 @@ bool FlashWrite(const void* pData, const u32 uAddress, const u32 uLength, const 
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
+bool SDCard_WriteToFlash(const char* const pszFileName, const u32 uFlashOffset)
+{
+	char szTempString[128];
+	FIL fil;
+
+	FRESULT fr = f_open(&fil, pszFileName, FA_OPEN_EXISTING | FA_READ);
+	if (FR_OK == fr)
+	{
+		const u32 uRomSize = f_size(&fil);
+		bool bVerifySuccess = true;
+		u32 uRomOffset = uFlashOffset;
+		u32 uBytesRead;
+
+		while(bVerifySuccess)
+		{
+			f_read(&fil, (void*)&s_aReadBuffer, 1024, &uBytesRead);
+
+			if(0 == uBytesRead)
+				break;
+
+			if (FlashIsErased(uRomOffset, uBytesRead))
+			{
+				// As the IO buffer is only 1k in size occasionally 1024 255's is the valid data!!!
+				// Kickstart 2.04 I'm looking at you!!!
+				if( !FlashVerify((void*)&s_aReadBuffer, uRomOffset, uBytesRead) )
+				{
+//					bVerifySuccess = FlashWrite((void*)&s_aReadBuffer, uRomOffset, uBytesRead, true);
+					bVerifySuccess = false;
+				}
+			}
+			else
+			{
+				bVerifySuccess = FlashVerify((void*)&s_aReadBuffer, uRomOffset, uBytesRead);
+			}
+
+			uRomOffset += uBytesRead;
+		}
+
+		f_close(&fil);
+		return bVerifySuccess;
+	}
+	else
+	{
+		sprintf(szTempString, "can't open file: %s", pszFileName);
+	}
+
+	return false;
+}
+
+//------------------------------------------------------------------------------------------------
+//----                                                                                        ----
+//------------------------------------------------------------------------------------------------
 int main()
 {
     stdio_init_all();
@@ -837,11 +889,11 @@ int main()
 
 	gpio_put(PIN_FLASH_RESET, true);
 
-    initVGA(PIN_RED, PIN_HSYNC, PIN_VSYNC);
+    vga_Init(PIN_RED, PIN_HSYNC, PIN_VSYNC);
 
 	char szTempString[128];
-	FilledRectangle(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB_GREEN);
-	FilledRectangle(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB_BLACK);
+	vga_FilledRect(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB_GREEN);
+	vga_FilledRect(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB_BLACK);
 
 	if (!FlashInitialise())
 	{
@@ -859,114 +911,84 @@ int main()
 	switch (s_flashROM.m_eManufacturer)
 	{
 		case FLASH_MANUFACTURER_MICRON:
-			DrawString(2, 52, "Flash Manufacturer MICRON", RGB_GREEN);
+			vga_DrawString(2, 52, "Flash Manufacturer MICRON", RGB_GREEN);
 		break;
 
 		case FLASH_MANUFACTURER_SST:
-			DrawString(2, 52, "Flash Manufacturer SST", RGB_GREEN);
+			vga_DrawString(2, 52, "Flash Manufacturer SST", RGB_GREEN);
 		break;
 
 		case FLASH_MANUFACTURER_MACRONIX:
-			DrawString(2, 52, "Flash Manufacturer MACRONIX", RGB_GREEN);
+			vga_DrawString(2, 52, "Flash Manufacturer MACRONIX", RGB_GREEN);
 		break;
 
 		default:
-			DrawString(2, 52, "Flash Manufacturer UNKNOWN", RGB_GREEN);
+			vga_DrawString(2, 52, "Flash Manufacturer UNKNOWN", RGB_GREEN);
 		break;
 	}
 
 	sprintf(szTempString, "Voltage %d.%d    %d Bit", s_flashROM.m_eVoltage >> 4, s_flashROM.m_eVoltage & 15, s_flashROM.m_u16Bit ? 16 : 8);
-	DrawString(32, 52, szTempString, RGB_GREEN);
+	vga_DrawString(32, 52, szTempString, RGB_GREEN);
 
 	switch (s_flashROM.m_eBootSector)
 	{
 		case FLASH_SECTOR_4K:
-			DrawString(2, 54, "4k Sectors", RGB_GREEN);
+			vga_DrawString(2, 54, "4k Sectors", RGB_GREEN);
 		break;
 
 		case FLASH_SECTOR_64K_TOP_BOOT:
-			DrawString(2, 54, "64k Sector Top Boot", RGB_GREEN);
+			vga_DrawString(2, 54, "64k Sector Top Boot", RGB_GREEN);
 		break;
 
 		case FLASH_SECTOR_64K_BOTTOM_BOOT:
-			DrawString(2, 54, "64k Sector Bottom Boot", RGB_GREEN);
+			vga_DrawString(2, 54, "64k Sector Bottom Boot", RGB_GREEN);
 		break;
 
 		default:
-			DrawString(2, 54, "Boot Sector None", RGB_GREEN);
+			vga_DrawString(2, 54, "Boot Sector None", RGB_GREEN);
 		break;
 	}
 
 	sprintf(szTempString, "Sector Count = %d   Size = %d KBytes", s_flashROM.m_uNumSectors, s_flashROM.m_uSize >> 10);
-	DrawString(27, 54, szTempString, RGB_GREEN);
+	vga_DrawString(27, 54, szTempString, RGB_GREEN);
 
 	sd_card_t *pSD = sd_get_by_num(0);
 
 	FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
 	if (FR_OK == fr)
 	{
-		FIL fil;
-//		const char* const filename = "VicTestRom.bin";
-//		const char* const filename = "Kickstart_1_2.rom";
-		const char* const filename = "Kickstart_2_04.rom";
-//		FlashEraseSector(150000, false);
-//		FlashErase(false);
+		// s_uTest = FlashGetSectorBase(80000);
+		// s_uTest = FlashGetSectorBase(2097152 - 1000);
+		// s_uTest = FlashGetSectorLength(80000);
 
-		fr = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
-		if (FR_OK == fr)
+		bool bVerifySuccess = true; //FlashErase(true);
+
+//		if (bVerifySuccess)
+//			bVerifySuccess = SDCard_WriteToFlash("AmigaDiag.rom", 0x00000000);
+
+		// if (bVerifySuccess)
+		// 	bVerifySuccess = SDCard_WriteToFlash("Kickstart_1_3.rom", 0x00080000);
+
+		// if (bVerifySuccess)
+		// 	bVerifySuccess = SDCard_WriteToFlash("Kickstart_2_04.rom", 0x00100000);
+
+		// if (bVerifySuccess)
+		// 	bVerifySuccess = SDCard_WriteToFlash("Kickstart_3_1.rom", 0x00180000);
+
+		if (bVerifySuccess)
 		{
-			const u32 uRomSize = f_size(&fil);
-			bool bVerifySuccess = true;
-			u32 uRomOffset = 0;
-			u32 uBytesRead;
-
-			// s_uTest = FlashGetSectorBase(80000);
-			// s_uTest = FlashGetSectorBase(2097152 - 1000);
-			// s_uTest = FlashGetSectorLength(80000);
-
-			while(bVerifySuccess)
-			{
-				f_read(&fil, (void*)&s_aReadBuffer, 1024, &uBytesRead);
-
-				if(0 == uBytesRead)
-					break;
-
-				if (FlashIsErased(uRomOffset, uBytesRead))
-				{
-					// As the IO buffer is only 1k in size occasionally 1024 255's is the valid data!!!
-					// Kickstart 2.04 I'm looking at you!!!
-					if( !FlashVerify((void*)&s_aReadBuffer, uRomOffset, uBytesRead) )
-						bVerifySuccess = FlashWrite((void*)&s_aReadBuffer, uRomOffset, uBytesRead, true);
-				}
-				else
-				{
-					bVerifySuccess = FlashVerify((void*)&s_aReadBuffer, uRomOffset, uBytesRead);
-				}
-
-				uRomOffset += uBytesRead;
-			}
-
-			if (bVerifySuccess)
-			{
-				DrawString(2, 2, "Flash Verify Success!!!", RGB_GREEN);
-			}
-			else
-			{
-				if (FlashIsErased(0, uRomSize))
-				{
-					DrawString(2, 2, "Flash Empty!!!", RGB_MAGENTA);
-				}
-				else
-				{
-					DrawString(2, 2, "Flash Verify Failed!!!", RGB_RED);
-				}
-			}
-
-			f_close(&fil);
+			vga_DrawString(2, 2, "Flash Verify Success!!!", RGB_GREEN);
 		}
 		else
 		{
-			sprintf(szTempString, "can't open file: %s", filename);
+			if (FlashIsErased(0, s_flashROM.m_uSize))
+			{
+				vga_DrawString(2, 2, "Flash Empty!!!", RGB_MAGENTA);
+			}
+			else
+			{
+				vga_DrawString(2, 2, "Flash Verify Failed!!!", RGB_RED);
+			}
 		}
 
 	    f_unmount(pSD->pcName);
@@ -974,7 +996,7 @@ int main()
 	else
 	{
 		sprintf(szTempString, "f_mount error: %s (%d)", FRESULT_str(fr), fr);
-		DrawString(2, 2, szTempString, RGB_RED);
+		vga_DrawString(2, 2, szTempString, RGB_RED);
 	}
 
 	// FIL fil;
@@ -1006,7 +1028,7 @@ int main()
 	while(true)
 	{
 		sprintf(szTempString, "Time On = %d.%d", uOnTime / 50, (uOnTime % 50) * 2);
-		DrawString(58, 2, szTempString, RGB_YELLOW);
+		vga_DrawString(58, 2, szTempString, RGB_YELLOW);
 		sleep_ms(16);
 		uOnTime++;
 	}
