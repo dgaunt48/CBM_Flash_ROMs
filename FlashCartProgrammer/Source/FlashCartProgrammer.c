@@ -72,8 +72,6 @@ enum mcu_pins
 
 #define ADDRESS_BUS_SIZE		(20)
 
-enum rgbColours {RGB_BLACK, RGB_RED, RGB_GREEN, RGB_YELLOW, RGB_BLUE, RGB_MAGENTA, RGB_CYAN, RGB_WHITE};
-
 static volatile u8 s_aReadBuffer[1024];
 static flashROM s_flashROM = {0};
 
@@ -786,13 +784,13 @@ bool FlashWrite(const void* pData, const u32 uAddress, const u32 uLength, const 
 }
 
 //------------------------------------------------------------------------------------------------
-//----                                                                                        ----
+//---- SDCard_WriteToFlash																	  ----
+//------------------------------------------------------------------------------------------------
+//---- NOTE:  This Function Will Do A Verify Without Writing If The Data Is Already Correct	  ----
 //------------------------------------------------------------------------------------------------
 bool SDCard_WriteToFlash(const char* const pszFileName, const u32 uFlashOffset)
 {
-	char szTempString[128];
 	FIL fil;
-
 	FRESULT fr = f_open(&fil, pszFileName, FA_OPEN_EXISTING | FA_READ);
 	if (FR_OK == fr)
 	{
@@ -805,22 +803,27 @@ bool SDCard_WriteToFlash(const char* const pszFileName, const u32 uFlashOffset)
 		{
 			f_read(&fil, (void*)&s_aReadBuffer, 1024, &uBytesRead);
 
-			if(0 == uBytesRead)
+			if (0 == uBytesRead)
 				break;
 
-			if (FlashIsErased(uRomOffset, uBytesRead))
+			// Check If The Data Is Already Correct
+			// As the IO buffer is only 1k in size
+			// occasionally 1024 255's is the valid data!!!
+			// Kickstart 2.04 I'm looking at you!!!
+			if (!FlashVerify((void*)&s_aReadBuffer, uRomOffset, uBytesRead))
 			{
-				// As the IO buffer is only 1k in size occasionally 1024 255's is the valid data!!!
-				// Kickstart 2.04 I'm looking at you!!!
-				if( !FlashVerify((void*)&s_aReadBuffer, uRomOffset, uBytesRead) )
+				// If The Data Is Incorrect Check If The Buffer Area Is Erased
+				if (FlashIsErased(uRomOffset, uBytesRead))
 				{
-//					bVerifySuccess = FlashWrite((void*)&s_aReadBuffer, uRomOffset, uBytesRead, true);
+					// Area Is Erased So Write And Verify The Buffer
+					bVerifySuccess = FlashWrite((void*)&s_aReadBuffer, uRomOffset, uBytesRead, true);
+				}
+				else
+				{
+					// Data Is Incorrect And The Area Is Not Erased
+					// There Is Nothing More We Can Do So ERROR!
 					bVerifySuccess = false;
 				}
-			}
-			else
-			{
-				bVerifySuccess = FlashVerify((void*)&s_aReadBuffer, uRomOffset, uBytesRead);
 			}
 
 			uRomOffset += uBytesRead;
@@ -829,10 +832,11 @@ bool SDCard_WriteToFlash(const char* const pszFileName, const u32 uFlashOffset)
 		f_close(&fil);
 		return bVerifySuccess;
 	}
-	else
-	{
-		sprintf(szTempString, "can't open file: %s", pszFileName);
-	}
+	// else
+	// {
+	// 	char szTempString[128];
+	// 	sprintf(szTempString, "can't open file: %s", pszFileName);
+	// }
 
 	return false;
 }
@@ -892,8 +896,8 @@ int main()
     vga_Init(PIN_RED, PIN_HSYNC, PIN_VSYNC);
 
 	char szTempString[128];
-	vga_FilledRect(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB_GREEN);
-	vga_FilledRect(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB_BLACK);
+	vga_FilledRect(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB111_GREEN);
+	vga_FilledRect(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB111_BLACK);
 
 	if (!FlashInitialise())
 	{
@@ -911,46 +915,46 @@ int main()
 	switch (s_flashROM.m_eManufacturer)
 	{
 		case FLASH_MANUFACTURER_MICRON:
-			vga_DrawString(2, 52, "Flash Manufacturer MICRON", RGB_GREEN);
+			vga_DrawString(2, 52, "Flash Manufacturer MICRON", RGB111_GREEN);
 		break;
 
 		case FLASH_MANUFACTURER_SST:
-			vga_DrawString(2, 52, "Flash Manufacturer SST", RGB_GREEN);
+			vga_DrawString(2, 52, "Flash Manufacturer SST", RGB111_GREEN);
 		break;
 
 		case FLASH_MANUFACTURER_MACRONIX:
-			vga_DrawString(2, 52, "Flash Manufacturer MACRONIX", RGB_GREEN);
+			vga_DrawString(2, 52, "Flash Manufacturer MACRONIX", RGB111_GREEN);
 		break;
 
 		default:
-			vga_DrawString(2, 52, "Flash Manufacturer UNKNOWN", RGB_GREEN);
+			vga_DrawString(2, 52, "Flash Manufacturer UNKNOWN", RGB111_GREEN);
 		break;
 	}
 
 	sprintf(szTempString, "Voltage %d.%d    %d Bit", s_flashROM.m_eVoltage >> 4, s_flashROM.m_eVoltage & 15, s_flashROM.m_u16Bit ? 16 : 8);
-	vga_DrawString(32, 52, szTempString, RGB_GREEN);
+	vga_DrawString(32, 52, szTempString, RGB111_GREEN);
 
 	switch (s_flashROM.m_eBootSector)
 	{
 		case FLASH_SECTOR_4K:
-			vga_DrawString(2, 54, "4k Sectors", RGB_GREEN);
+			vga_DrawString(2, 54, "4k Sectors", RGB111_GREEN);
 		break;
 
 		case FLASH_SECTOR_64K_TOP_BOOT:
-			vga_DrawString(2, 54, "64k Sector Top Boot", RGB_GREEN);
+			vga_DrawString(2, 54, "64k Sector Top Boot", RGB111_GREEN);
 		break;
 
 		case FLASH_SECTOR_64K_BOTTOM_BOOT:
-			vga_DrawString(2, 54, "64k Sector Bottom Boot", RGB_GREEN);
+			vga_DrawString(2, 54, "64k Sector Bottom Boot", RGB111_GREEN);
 		break;
 
 		default:
-			vga_DrawString(2, 54, "Boot Sector None", RGB_GREEN);
+			vga_DrawString(2, 54, "Boot Sector None", RGB111_GREEN);
 		break;
 	}
 
 	sprintf(szTempString, "Sector Count = %d   Size = %d KBytes", s_flashROM.m_uNumSectors, s_flashROM.m_uSize >> 10);
-	vga_DrawString(27, 54, szTempString, RGB_GREEN);
+	vga_DrawString(27, 54, szTempString, RGB111_GREEN);
 
 	sd_card_t *pSD = sd_get_by_num(0);
 
@@ -961,7 +965,13 @@ int main()
 		// s_uTest = FlashGetSectorBase(2097152 - 1000);
 		// s_uTest = FlashGetSectorLength(80000);
 
-		bool bVerifySuccess = true; //FlashErase(true);
+		bool bVerifySuccess = SDCard_WriteToFlash("VicDiagROM.a0", 0x00000000);
+
+		if (!bVerifySuccess)
+		{
+			FlashEraseSector(0, false);
+			bVerifySuccess = SDCard_WriteToFlash("VicDiagROM.a0", 0x00000000);
+		}
 
 //		if (bVerifySuccess)
 //			bVerifySuccess = SDCard_WriteToFlash("AmigaDiag.rom", 0x00000000);
@@ -977,17 +987,17 @@ int main()
 
 		if (bVerifySuccess)
 		{
-			vga_DrawString(2, 2, "Flash Verify Success!!!", RGB_GREEN);
+			vga_DrawString(2, 2, "Flash Verify Success!!!", RGB111_GREEN);
 		}
 		else
 		{
 			if (FlashIsErased(0, s_flashROM.m_uSize))
 			{
-				vga_DrawString(2, 2, "Flash Empty!!!", RGB_MAGENTA);
+				vga_DrawString(2, 2, "Flash Empty!!!", RGB111_MAGENTA);
 			}
 			else
 			{
-				vga_DrawString(2, 2, "Flash Verify Failed!!!", RGB_RED);
+				vga_DrawString(2, 2, "Flash Verify Failed!!!", RGB111_RED);
 			}
 		}
 
@@ -996,7 +1006,7 @@ int main()
 	else
 	{
 		sprintf(szTempString, "f_mount error: %s (%d)", FRESULT_str(fr), fr);
-		vga_DrawString(2, 2, szTempString, RGB_RED);
+		vga_DrawString(2, 2, szTempString, RGB111_RED);
 	}
 
 	// FIL fil;
@@ -1021,14 +1031,14 @@ int main()
 		const u32 uAddress = uFlashOffset + (uLine << 4);
 
 		if (FlashRead(aLineBuffer, uAddress, 16))
-			FormatHexDumpLine(3, 10 + uLine, uAddress, aLineBuffer, RGB_CYAN, s_flashROM.m_u16Bit ? true : false);
+			FormatHexDumpLine(3, 10 + uLine, uAddress, aLineBuffer, RGB111_CYAN, s_flashROM.m_u16Bit ? true : false);
 	}
 
 	u32 uOnTime = 0;
 	while(true)
 	{
 		sprintf(szTempString, "Time On = %d.%d", uOnTime / 50, (uOnTime % 50) * 2);
-		vga_DrawString(58, 2, szTempString, RGB_YELLOW);
+		vga_DrawString(58, 2, szTempString, RGB111_YELLOW);
 		sleep_ms(16);
 		uOnTime++;
 	}

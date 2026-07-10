@@ -1,0 +1,376 @@
+GLOBAL
+{
+    STARTADDR   $A000;
+    CPU         "6502";
+};
+
+# Standard Header Vectors and Signatures
+RANGE { START $A000; END $A003; TYPE AddrTable; };
+RANGE { START $A004; END $A018; TYPE ByteTable; };
+RANGE { START $A019; END $A19B; TYPE Code; };
+RANGE { START $A19C; END $A1F3; TYPE ByteTable; };
+RANGE { START $A1F4; END $A279; TYPE Code; };
+
+# The "CYCLE 000000" text string
+RANGE { START $A27A; END $A288; TYPE TextTable; };
+RANGE { START $A289; END $A35D; TYPE Code; };
+
+# The " RAM TEST " text string
+RANGE { START $A35E; END $A368; TYPE TextTable; };
+RANGE { START $A369; END $A3A6; TYPE Code; };
+
+# The " COLOR RAM TEST: " text string
+RANGE { START $A3A7; END $A3B8; TYPE TextTable; };
+RANGE { START $A3B9; END $A40C; TYPE Code; };
+
+# The " ROMCHECK " text string
+RANGE { START $A40D; END $A418; TYPE TextTable; };
+
+# The 3-column ROM Checksum Limit and Target Vector Tables
+RANGE { START $A419; END $A421; TYPE ByteTable; };
+RANGE { START $A422; END $A4AB; TYPE Code; };
+
+# The VIA Port validation routine
+#RANGE { START $A422; END $A49C; TYPE Code; };
+
+# The " KEYBOARD TEST: " text string
+RANGE { START $A4AC; END $A508; TYPE TextTable; };
+RANGE { START $A509; END $A748; TYPE Code; };
+
+# The 16-bit text address pointer vectors (10 strings x 2 bytes = 20 bytes)
+RANGE { START $A749; END $A75C; TYPE AddrTable; };
+
+# The literal interrupt text strings begin immediately after the vector table
+RANGE { START $A75D; END $A806; TYPE TextTable; };
+RANGE { START $A807; END $A915; TYPE Code; };
+
+# The "SOUND TEST:" text string
+RANGE { START $A916; END $A924; TYPE TextTable; };
+
+# Real code for the sound registers resumes here
+RANGE { START $A925; END $A976; TYPE Code; };
+RANGE { START $A977; END $A9C6; TYPE ByteTable; };
+RANGE { START $A9C7; END $AA62; TYPE Code; };
+
+# Clock calculation array limits
+RANGE { START $AA63; END $AA67; TYPE ByteTable; };
+
+# Core execution block for system clock banner printing
+RANGE { START $AA68; END $AAA6; TYPE Code; };
+RANGE { START $AAA7; END $AAC0; TYPE ByteTable; };
+
+# Dynamic string conversion, port polling, and edge tracking
+RANGE { START $AAC1; END $AB43; TYPE Code; };
+
+# Forced alignment block for the system NMI interrupt handler wrapper
+RANGE { START $AB44; END $AB91; TYPE Code; };
+
+# The "WRONG INTERRUPT"
+RANGE { START $AB92; END $ABA0; TYPE TextTable; };
+RANGE { START $ABA1; END $AC80; TYPE Code; };
+
+# Master Diagnostic OK Status String
+RANGE { START $AC81; END $AC82; TYPE TextTable; };
+
+# Screen Map Row Pointer High-Byte Vectors
+RANGE { START $AC83; END $ACAF; TYPE ByteTable; };
+
+RANGE { START $ACB0; END $ACB5; TYPE TextTable; }; # "BAD   " Text
+RANGE { START $ACB6; END $ACB7; TYPE ByteTable; }; # "BAD   " 16-Bit Vector
+RANGE { START $ACB8; END $ACBD; TYPE TextTable; }; # "TIMTEM" Text
+RANGE { START $ACBE; END $ACBF; TYPE ByteTable; }; # "TIMTEM" 16-Bit Vector
+RANGE { START $ACC0; END $ACC5; TYPE TextTable; }; # "TINIT " Text
+RANGE { START $ACC6; END $ACC7; TYPE ByteTable; }; # "TINIT " 16-Bit Vector
+RANGE { START $ACC8; END $ACCD; TYPE TextTable; }; # "TK105 " Text
+RANGE { START $ACCE; END $ACCF; TYPE ByteTable; }; # "TK105 " 16-Bit Vector
+RANGE { START $ACD0; END $ACD5; TYPE TextTable; }; # "TKEY10" Text
+RANGE { START $ACD6; END $ACD7; TYPE ByteTable; }; # "TKEY10" 16-Bit Vector
+RANGE { START $ACD8; END $ACDD; TYPE TextTable; }; # "TKEYS " Text
+RANGE { START $ACDE; END $ACDF; TYPE ByteTable; }; # "TKEYS " 16-Bit Vector
+RANGE { START $ACE0; END $ACE5; TYPE TextTable; }; # "TRGVAL" Text
+RANGE { START $ACE6; END $ACE7; TYPE ByteTable; }; # "TRGVAL" 16-Bit Vector
+RANGE { START $ACE8; END $ACED; TYPE TextTable; }; # "TRIGER" Text
+RANGE { START $ACEE; END $ACEF; TYPE ByteTable; }; # "TRIGER" 16-Bit Vector
+RANGE { START $ACF0; END $ACF5; TYPE TextTable; }; # "TSTNUM" Text
+RANGE { START $ACF6; END $ACF7; TYPE ByteTable; }; # "TSTNUM" 16-Bit Vector
+RANGE { START $ACF8; END $ACFD; TYPE TextTable; }; # "TVIC  " Text
+RANGE { START $ACFE; END $ACFF; TYPE ByteTable; }; # "TVIC  " 16-Bit Vector
+RANGE { START $AD00; END $AD05; TYPE TextTable; }; # "TWOBYT" Text
+RANGE { START $AD06; END $AD07; TYPE ByteTable; }; # "TWOBYT" 16-Bit Vector
+RANGE { START $AD08; END $AD0D; TYPE TextTable; }; # "UNTRG " Text
+RANGE { START $AD0E; END $AD0F; TYPE ByteTable; }; # "UNTRG " 16-Bit Vector
+RANGE { START $AD10; END $AD15; TYPE TextTable; }; # "UPTIME" Text
+RANGE { START $AD16; END $AD17; TYPE ByteTable; }; # "UPTIME" 16-Bit Vector
+RANGE { START $AD18; END $AD1D; TYPE TextTable; }; # "DUSRMS" Text
+RANGE { START $AD1E; END $AD1F; TYPE ByteTable; }; # "DUSRMS" 16-Bit Vector
+RANGE { START $AD20; END $AD25; TYPE TextTable; }; # "USRTST" Text
+RANGE { START $AD26; END $AD27; TYPE ByteTable; }; # "USRTST" 16-Bit Vector
+RANGE { START $AD28; END $AD2D; TYPE TextTable; }; # "VIC50 " Text
+RANGE { START $AD2E; END $AD2F; TYPE ByteTable; }; # "VIC50 " 16-Bit Vector
+RANGE { START $AD30; END $AD35; TYPE TextTable; }; # "VICCOL" Text
+RANGE { START $AD36; END $AD37; TYPE ByteTable; }; # "VICCOL" 16-Bit Vector
+RANGE { START $AD38; END $AD3D; TYPE TextTable; }; # "VICREG" Text
+RANGE { START $AD3E; END $AD3F; TYPE ByteTable; }; # "VICREG" 16-Bit Vector
+RANGE { START $AD40; END $AD45; TYPE TextTable; }; # "VICSCN" Text
+RANGE { START $AD46; END $AD47; TYPE ByteTable; }; # "VICSCN" 16-Bit Vector
+RANGE { START $AD48; END $AD4D; TYPE TextTable; }; # "WA100 " Text
+RANGE { START $AD4E; END $AD4F; TYPE ByteTable; }; # "WA100 " 16-Bit Vector
+RANGE { START $AD50; END $AD55; TYPE TextTable; }; # "WA400 " Text
+RANGE { START $AD56; END $AD57; TYPE ByteTable; }; # "WA400 " 16-Bit Vector
+RANGE { START $AD58; END $AD5D; TYPE TextTable; }; # "WA600 " Text
+RANGE { START $AD5E; END $AD5F; TYPE ByteTable; }; # "WA600 " 16-Bit Vector
+RANGE { START $AD60; END $AD65; TYPE TextTable; }; # "WA700 " Text
+RANGE { START $AD66; END $AD67; TYPE ByteTable; }; # "WA700 " 16-Bit Vector
+RANGE { START $AD68; END $AD6D; TYPE TextTable; }; # "WAIT  " Text
+RANGE { START $AD6E; END $AD6F; TYPE ByteTable; }; # "WAIT  " 16-Bit Vector
+RANGE { START $AD70; END $AD75; TYPE TextTable; }; # "WAITZ " Text
+RANGE { START $AD76; END $AD77; TYPE ByteTable; }; # "WAITZ " 16-Bit Vector
+RANGE { START $AD78; END $AD7D; TYPE TextTable; }; # "WBAD  " Text
+RANGE { START $AD7E; END $AD7F; TYPE ByteTable; }; # "WBAD  " 16-Bit Vector
+RANGE { START $AD80; END $AD85; TYPE TextTable; }; # "WHITE " Text
+RANGE { START $AD86; END $AD87; TYPE ByteTable; }; # "WHITE " 16-Bit Vector
+RANGE { START $AD88; END $AD8D; TYPE TextTable; }; # "WR400 " Text
+RANGE { START $AD8E; END $AD8F; TYPE ByteTable; }; # "WR400 " 16-Bit Vector
+RANGE { START $AD90; END $AD95; TYPE TextTable; }; # "WR500 " Text
+RANGE { START $AD96; END $AD97; TYPE ByteTable; }; # "WR500 " 16-Bit Vector
+RANGE { START $AD98; END $AD9D; TYPE TextTable; }; # "WROB  " Text
+RANGE { START $AD9E; END $AD9F; TYPE ByteTable; }; # "WROB  " 16-Bit Vector
+RANGE { START $ADA0; END $ADA5; TYPE TextTable; }; # "WRONG " Text
+RANGE { START $ADA6; END $ADA7; TYPE ByteTable; }; # "WRONG " 16-Bit Vector
+RANGE { START $ADA8; END $ADAD; TYPE TextTable; }; # "WTLP1 " Text
+RANGE { START $ADAE; END $ADAF; TYPE ByteTable; }; # "WTLP1 " 16-Bit Vector
+RANGE { START $ADB0; END $ADB5; TYPE TextTable; }; # "WTLP4 " Text
+RANGE { START $ADB6; END $ADB7; TYPE ByteTable; }; # "WTLP4 " 16-Bit Vector
+RANGE { START $ADB8; END $ADBD; TYPE TextTable; }; # "WTLP41" Text
+RANGE { START $ADBE; END $ADBF; TYPE ByteTable; }; # "WTLP41" 16-Bit Vector
+RANGE { START $ADC0; END $ADC5; TYPE TextTable; }; # "WTLP5 " Text
+RANGE { START $ADC6; END $ADC7; TYPE ByteTable; }; # "WTLP5 " 16-Bit Vector
+RANGE { START $ADC8; END $ADCD; TYPE TextTable; }; # "ZLOOP " Text
+RANGE { START $ADCE; END $ADCF; TYPE ByteTable; }; # "ZLOOP " 16-Bit Vector
+RANGE { START $ADD0; END $ADD5; TYPE TextTable; }; # "ZMSG1 " Text
+RANGE { START $ADD6; END $ADD7; TYPE ByteTable; }; # "ZMSG1 " 16-Bit Vector
+RANGE { START $ADD8; END $ADDD; TYPE TextTable; }; # "ZP100 " Text
+RANGE { START $ADDE; END $ADDF; TYPE ByteTable; }; # "ZP100 " 16-Bit Vector
+RANGE { START $ADE0; END $ADE5; TYPE TextTable; }; # "ZP120 " Text
+RANGE { START $ADE6; END $ADE7; TYPE ByteTable; }; # "ZP120 " 16-Bit Vector
+RANGE { START $ADE8; END $ADED; TYPE TextTable; }; # "ZP140 " Text
+RANGE { START $ADEE; END $ADEF; TYPE ByteTable; }; # "ZP140 " 16-Bit Vector
+RANGE { START $ADF0; END $ADF5; TYPE TextTable; }; # "ZP200 " Text
+RANGE { START $ADF6; END $ADF7; TYPE ByteTable; }; # "ZP200 " 16-Bit Vector
+RANGE { START $ADF8; END $ADFD; TYPE TextTable; }; # "ZPADR " Text
+RANGE { START $ADFE; END $ADFF; TYPE ByteTable; }; # "ZPADR " 16-Bit Vector
+RANGE { START $AE00; END $AE05; TYPE TextTable; }; # "ZPALT " Text
+RANGE { START $AE06; END $AE07; TYPE ByteTable; }; # "ZPALT " 16-Bit Vector
+RANGE { START $AE08; END $AE0D; TYPE TextTable; }; # "ZPB30 " Text
+RANGE { START $AE0E; END $AE0F; TYPE ByteTable; }; # "ZPB30 " 16-Bit Vector
+RANGE { START $AE10; END $AE15; TYPE TextTable; }; # "ZPB50 " Text
+RANGE { START $AE16; END $AE17; TYPE ByteTable; }; # "ZPB50 " 16-Bit Vector
+RANGE { START $AE18; END $AE1D; TYPE TextTable; }; # "ZPBAD " Text
+RANGE { START $AE1E; END $AE1F; TYPE ByteTable; }; # "ZPBAD " 16-Bit Vector
+RANGE { START $AE20; END $AE25; TYPE TextTable; }; # "ZPMSG " Text
+RANGE { START $AE26; END $AE27; TYPE ByteTable; }; # "ZPMSG " 16-Bit Vector
+RANGE { START $AE28; END $AE2D; TYPE TextTable; }; # "ZPST10" Text
+RANGE { START $AE2E; END $AE2F; TYPE ByteTable; }; # "ZPST10" 16-Bit Vector
+
+# Map out the 3-byte ROM Checksum Metadata Block
+RANGE { START $AE30; END $AE32; TYPE ByteTable; };
+
+RANGE { START $AE33; END $AE38; TYPE Code; };
+RANGE { START $AE39; END $AFFF; TYPE ByteTable; };
+
+# ==============================================================================
+# 6560 / 6561 VIC-I VIDEO & AUDIO REGISTER MAP ($9000-$900F)
+# ==============================================================================
+LABEL { NAME "VIC_REG_SCREEN_X";                ADDR $9000; }; # Screen Interlace / Left Margin
+LABEL { NAME "VIC_REG_SCREEN_Y";                ADDR $9001; }; # Top Margin Position
+LABEL { NAME "VIC_REG_COLS_NUM";                ADDR $9002; }; # Number of Video Screen Columns
+LABEL { NAME "VIC_REG_ROWS_NUM";                ADDR $9003; }; # Number of Video Screen Rows
+LABEL { NAME "VIC_REG_RASTER_LINE";             ADDR $9004; }; # Current Raster Scan Line Matrix
+LABEL { NAME "VIC_REG_CHAR_MAP_PTR";            ADDR $9005; }; # Screen Canvas / Character Map Pointer
+LABEL { NAME "VIC_REG_LIGHT_PEN_X";             ADDR $9006; }; # Light Pen Horizontal Position
+LABEL { NAME "VIC_REG_LIGHT_PEN_Y";             ADDR $9007; }; # Light Pen Vertical Position
+LABEL { NAME "VIC_REG_AUDIO_BASS";              ADDR $900A; }; # Audio Oscillator 1 (Bass Voice)
+LABEL { NAME "VIC_REG_AUDIO_ALTO";              ADDR $900B; }; # Audio Oscillator 2 (Alto Voice)
+LABEL { NAME "VIC_REG_AUDIO_TENOR";             ADDR $900C; }; # Audio Oscillator 3 (Tenor Voice)
+LABEL { NAME "VIC_REG_AUDIO_NOISE";             ADDR $900D; }; # Audio Oscillator 4 (White Noise)
+LABEL { NAME "VIC_REG_AUDIO_VOL";               ADDR $900E; }; # Master Volume / Auxiliary Color
+LABEL { NAME "VIC_REG_BG_BORDER_CLR";           ADDR $900F; }; # Background / Border Color Matrix
+    
+LABEL { NAME "VIC_TABLE_NTSC_GEOMETRY";         ADDR $A977; };
+LABEL { NAME "VIC_TABLE_PAL_GEOMETRY";          ADDR $A981; };
+LABEL { NAME "VIC_TABLE_SCREEN_COLS";           ADDR $A98B; };
+LABEL { NAME "VIC_TABLE_AUDIO_VOICES";          ADDR $A995; };
+LABEL { NAME "VIC_TABLE_REG_OFFSETS";           ADDR $A99F; };
+LABEL { NAME "VIC_TABLE_SYNC_MARKERS";          ADDR $A9A9; };
+LABEL { NAME "VIC_TABLE_ROW_SPACERS_A";         ADDR $A9B3; };
+LABEL { NAME "VIC_TABLE_ROW_SPACERS_B";         ADDR $A9BD; };
+    
+LABEL { NAME "SCR_ROW_ADDR_LO_BASE";            ADDR $AC85; };
+LABEL { NAME "SCR_ROW_ADDR_LO_OFFSETS";         ADDR $AC86; };
+LABEL { NAME "SCR_ROW_ADDR_HI_BASE";            ADDR $AC9B; };
+LABEL { NAME "SCR_ROW_ADDR_HI_OFFSETS";         ADDR $AC9C; };
+LABEL { NAME "STR_SPLASH_STACK_OK";             ADDR $A1C5; };
+LABEL { NAME "STR_SPLASH_ZERO_PAGE";            ADDR $A1D9; };
+LABEL { NAME "STR_SPLASH_STACK_PAGE";           ADDR $A1E4; };
+    
+LABEL { NAME "BOOT_STACK_RAM_CHECK";            ADDR $A143; };
+LABEL { NAME "BOOT_ERR_STACK_RAM_FAIL";         ADDR $A169; };
+
+# ==============================================================================
+# 6522 VIA CHIP #1 REGISTER MAP ($9110-$911F)
+# ==============================================================================
+LABEL { NAME "VIA1_PORT_B";                     ADDR $9110; }; # User Port Data / RS-232
+LABEL { NAME "VIA1_PORT_A";                     ADDR $9111; }; # Handshake Data Output
+LABEL { NAME "VIA1_DDR_B";                      ADDR $9112; }; # Data Direction Register B
+LABEL { NAME "VIA1_DDR_A";                      ADDR $9113; }; # Data Direction Register A
+LABEL { NAME "VIA1_T1_CTR_LO";                  ADDR $9114; }; # Timer 1 Latch Counter Low
+LABEL { NAME "VIA1_T1_CTR_HI";                  ADDR $9115; }; # Timer 1 Latch Counter High
+LABEL { NAME "VIA1_T1_LAT_LO";                  ADDR $9116; }; # Timer 1 Re-load Latch Low
+LABEL { NAME "VIA1_T1_LAT_HI";                  ADDR $9117; }; # Timer 1 Re-load Latch High
+LABEL { NAME "VIA1_T2_CTR_LO";                  ADDR $9118; }; # Timer 2 Latch Counter Low
+LABEL { NAME "VIA1_T2_CTR_HI";                  ADDR $9119; }; # Timer 2 Latch Counter High
+LABEL { NAME "VIA1_SHIFT_REG";                  ADDR $911A; }; # Synchronous Shift Register
+LABEL { NAME "VIA1_AUX_CTRL";                   ADDR $911B; }; # Auxiliary Control Register
+LABEL { NAME "VIA1_PER_CTRL";                   ADDR $911C; }; # Peripheral Control Register
+LABEL { NAME "VIA1_INT_FLAGS";                  ADDR $911D; }; # Interrupt Flag Register
+LABEL { NAME "VIA1_INT_ENABLE";                 ADDR $911E; }; # Interrupt Enable Register
+LABEL { NAME "VIA1_PORT_A_NH";                  ADDR $911F; }; # Port A Data (No Handshake)
+
+# ==============================================================================
+# 6522 VIA CHIP #2 REGISTER MAP ($9120-$912F)
+# ==============================================================================
+LABEL { NAME "VIA2_PORT_B";                     ADDR $9120; }; # Keyboard Columns / User Port
+LABEL { NAME "VIA2_PORT_A";                     ADDR $9121; }; # Keyboard Rows / Joystick / Serial
+LABEL { NAME "VIA2_DDR_B";                      ADDR $9122; }; # Data Direction Register B
+LABEL { NAME "VIA2_DDR_A";                      ADDR $9123; }; # Data Direction Register A
+LABEL { NAME "VIA2_T1_CTR_LO";                  ADDR $9124; }; # Timer 1 Latch Counter Low
+LABEL { NAME "VIA2_T1_CTR_HI";                  ADDR $9125; }; # Timer 1 Latch Counter High
+LABEL { NAME "VIA2_T1_LAT_LO";                  ADDR $9126; }; # Timer 1 Re-load Latch Low
+LABEL { NAME "VIA2_T1_LAT_HI";                  ADDR $9127; }; # Timer 1 Re-load Latch High
+LABEL { NAME "VIA2_T2_CTR_LO";                  ADDR $9128; }; # Timer 2 Latch Counter Low
+LABEL { NAME "VIA2_T2_CTR_HI";                  ADDR $9129; }; # Timer 2 Latch Counter High
+LABEL { NAME "VIA2_SHIFT_REG";                  ADDR $912A; }; # Synchronous Shift Register
+LABEL { NAME "VIA2_AUX_CTRL";                   ADDR $912B; }; # Auxiliary Control Register
+LABEL { NAME "VIA2_PER_CTRL";                   ADDR $912C; }; # Peripheral Control Register
+LABEL { NAME "VIA2_INT_FLAGS";                  ADDR $912D; }; # Interrupt Flag Register
+LABEL { NAME "VIA2_INT_ENABLE";                 ADDR $912E; }; # Interrupt Enable Register
+LABEL { NAME "VIA2_PORT_A_NH";                  ADDR $912F; }; # Port A Data (No Handshake)
+
+LABEL { NAME "VIDEO_RAM_PAGE_1";                ADDR $1E00; }; # Lower 256 Text Cells
+LABEL { NAME "VIDEO_RAM_PAGE_2";                ADDR $1F00; }; # Upper Video Text Cells
+LABEL { NAME "COLOR_RAM_PAGE_1";                ADDR $9600; }; # Lower 256 Color Cells
+LABEL { NAME "COLOR_RAM_PAGE_2";                ADDR $9700; }; # Upper Color RAM Cells
+
+# Zero-Page Variable Map Registry
+LABEL { NAME "ZP_PTR_INDIRECT_A_LO";            ADDR $0002; };
+LABEL { NAME "ZP_PTR_INDIRECT_A_HI";            ADDR $0003; };
+LABEL { NAME "ZP_PTR_INDIRECT_B_LO";            ADDR $0006; };
+LABEL { NAME "ZP_PTR_INDIRECT_B_HI";            ADDR $0007; };
+LABEL { NAME "ZP_TEMP_CHAR_DATA";               ADDR $0008; };
+LABEL { NAME "ZP_TEMP_STRING_LEN";              ADDR $0009; };
+LABEL { NAME "ZP_SCREEN_SCROLL_FLG";            ADDR $000B; };
+LABEL { NAME "ZP_SAVED_REG_C";                  ADDR $000C; };
+LABEL { NAME "ZP_SAVED_REG_D";                  ADDR $000D; };
+LABEL { NAME "ZP_SAVED_REG_E";                  ADDR $000E; };
+LABEL { NAME "ZP_SAVED_REG_F";                  ADDR $000F; };
+LABEL { NAME "ZP_SCREEN_BUF_POS";               ADDR $0010; };
+LABEL { NAME "ZP_PORT_LINE_OFFSET";             ADDR $0015; };
+LABEL { NAME "ZP_STRING_SELECT_IDX";            ADDR $0016; };
+LABEL { NAME "ZP_MATRIX_SCAN_CTR";              ADDR $0017; };
+LABEL { NAME "ZP_DIAG_CHECKPOINT_CTR";          ADDR $0018; };
+LABEL { NAME "ZP_LOOP_LIMIT_CTR";               ADDR $0019; };
+LABEL { NAME "ZP_VIC_REG_PTR_LO";               ADDR $001A; };
+LABEL { NAME "ZP_VIC_REG_PTR_HI";               ADDR $001B; };
+LABEL { NAME "ZP_DIAG_SYSTEM_FLG";              ADDR $001D; };
+LABEL { NAME "ZP_RAM_SIZE_PTR_A_LO";            ADDR $001E; };
+LABEL { NAME "ZP_RAM_SIZE_PTR_A_HI";            ADDR $001F; };
+LABEL { NAME "ZP_RAM_SIZE_PTR_B_LO";            ADDR $0020; };
+LABEL { NAME "ZP_RAM_SIZE_PTR_B_HI";            ADDR $0021; };
+LABEL { NAME "ZP_AUDIO_FREQ_LO";                ADDR $0022; };
+LABEL { NAME "ZP_AUDIO_FREQ_HI";                ADDR $0023; };
+LABEL { NAME "ZP_LOOP_PASS_CTR";                ADDR $0025; };
+
+LABEL { NAME "RAM_IRQ_VECTOR_LO";               ADDR $0314; };
+LABEL { NAME "RAM_IRQ_VECTOR_HI";               ADDR $0315; };
+LABEL { NAME "RAM_NMI_VECTOR_LO";               ADDR $0318; };
+LABEL { NAME "RAM_NMI_VECTOR_HI";               ADDR $0319; };
+LABEL { NAME "RAM_CYCLE_CLOCK_BUFFER";          ADDR $0407; }; # Diagnostic Runtime Cycle Clock Character Buffer (6 Bytes)
+LABEL { NAME "REG_AUDIO_STATUS_FLG";            ADDR $041A; }; # Diagnostic Sync Flag
+LABEL { NAME "REG_LOOP_IDX";                    ADDR $041B; };
+
+LABEL { NAME "VIC_INIT_REG_MATRIX";             ADDR $A008; };
+LABEL { NAME "BOOT_HARDWARE_INIT";              ADDR $A019; };
+LABEL { NAME "IRQ_HANDLER";                     ADDR $AA07; };
+LABEL { NAME "ERR_HANDLER_CATASTROPHIC_IRQ";    ADDR $AB74; };
+LABEL { NAME "VIA_EDGE_NMI_HANDLER";            ADDR $AB48; };
+LABEL { NAME "VIA_EDGE_IRQ_HANDLER";            ADDR $AB4D; };
+
+LABEL { NAME "STR_RAM_TEST_PTR";                ADDR $A35E; };
+LABEL { NAME "STR_COLOR_RAM_TEST_PTR";          ADDR $A3A7; };
+LABEL { NAME "STR_ROMCHECK_PTR";                ADDR $A40E; };
+LABEL { NAME "STR_KEYBOARD_TEST_PTR";           ADDR $A4AC; };
+LABEL { NAME "STR_SKIP_PTR";                    ADDR $A4BD; };
+LABEL { NAME "STR_USER_PORT_PTR";               ADDR $A4C5; };
+LABEL { NAME "STR_SERIAL_BUS_PTR";              ADDR $A4D6; };
+LABEL { NAME "STR_CASSETTE_PORT_PTR";           ADDR $A4E7; };
+LABEL { NAME "STR_JOYSTICK_PORT_PTR";           ADDR $A4F8; };
+LABEL { NAME "STR_SOUND_TEST_PTR";              ADDR $A916; };
+LABEL { NAME "STR_WRONG_INTERRUPT_PTR";         ADDR $AB92; };
+LABEL { NAME "STR_OK_PTR";                      ADDR $AC81; };
+LABEL { NAME "STR_DICTIONARY_PTR";              ADDR $ACB1; };
+
+LABEL { NAME "CLOCK_BCD_CARRY_THRESHOLDS";      ADDR $AA63; };
+LABEL { NAME "CLOCK_BANNER_COLUMN_OFFSETS";     ADDR $AAA7; };
+LABEL { NAME "CLOCK_BANNER_TEXT_TEMPLATE";      ADDR $AAAB; };
+
+LABEL { NAME "ROM_START_HI_BYTES";              ADDR $A419; };
+LABEL { NAME "ROM_PAGE_COUNT_SIZERS";           ADDR $A41C; };
+LABEL { NAME "ROM_TARGET_CHECKSUMS";            ADDR $A41F; };
+LABEL { NAME "VIA_PORT_OFFSET_TABLE";           ADDR $A4C3; };
+
+LABEL { NAME "INIT_STEP_BCD_CLOCK";             ADDR $AA35; };
+LABEL { NAME "INIT_REFRESH_CLOCK_BANNER";       ADDR $AA68; };
+LABEL { NAME "INIT_MAP_MEMORY_BOUNDS";          ADDR $A289; };
+LABEL { NAME "INIT_HOOK_SYSTEM_IRQ";            ADDR $A9E6; };
+LABEL { NAME "INIT_MAP_EXPANSION_BOUNDS";       ADDR $A294; };
+
+LABEL { NAME "TEST_LOOP_RECYCLE";               ADDR $A04F; };
+LABEL { NAME "TEST_PHASE_RAM";                  ADDR $A082; };
+LABEL { NAME "TEST_PHASE_MANAGER";              ADDR $A1F4; };
+LABEL { NAME "TEST_PHASE_COLOR_RAM";            ADDR $A39A; };
+LABEL { NAME "TEST_PHASE_ROM_CHECKSUM";         ADDR $A3BD; };
+LABEL { NAME "TEST_PHASE_KEYBOARD";             ADDR $A422; };
+LABEL { NAME "TEST_PHASE_VIC_SOUND";            ADDR $A807; };
+LABEL { NAME "TEST_ROM_CHECKSUM_INIT";          ADDR $A3B9; };
+LABEL { NAME "TEST_VIA_EDGE_IRQ_SETUP";         ADDR $A496; };
+LABEL { NAME "TEST_PHASE_VIA_EDGE_CHECKS";      ADDR $A6E2; };
+LABEL { NAME "TEST_PORT_IEC_SERIAL";            ADDR $A509; };
+LABEL { NAME "TEST_PORT_CASSETTE";              ADDR $A5B7; };
+LABEL { NAME "TEST_PORT_JOYSTICK";              ADDR $A622; };
+LABEL { NAME "TEST_PORT_USER_PORT";             ADDR $A693; };
+
+LABEL { NAME "ERR_TRAP_IEC_SERIAL_FAIL_A";      ADDR $A587; };
+LABEL { NAME "ERR_TRAP_IEC_SERIAL_FAIL_B";      ADDR $A597; };
+LABEL { NAME "ERR_TRAP_IEC_SERIAL_FAIL_C";      ADDR $A5A7; };
+LABEL { NAME "ERR_TRAP_CASSETTE_FAIL_A";        ADDR $A602; };
+LABEL { NAME "ERR_TRAP_CASSETTE_FAIL_B";        ADDR $A612; };
+LABEL { NAME "ERR_TRAP_JOYSTICK_FAIL";          ADDR $A683; };
+
+LABEL { NAME "UTIL_RECYCLE_RESET";              ADDR $ABA1; };
+LABEL { NAME "UTIL_HARDWARE_DELAY";             ADDR $AAD1; };
+LABEL { NAME "UTIL_PRINT_CHAR";                 ADDR $ABB2; };
+LABEL { NAME "UTIL_CLEAR_SCREEN_CANVAS";        ADDR $ABCA; };
+LABEL { NAME "UTIL_HEX_TO_ASCII";               ADDR $AC07; };
+LABEL { NAME "UTIL_PRINT_STRING";               ADDR $AC5C; };
+LABEL { NAME "UTIL_PRINT_PASS_STATUS";          ADDR $AC79; };
+LABEL { NAME "UTIL_FLASH_ERROR_HANDLER";        ADDR $AC25; };
+LABEL { NAME "UTIL_INCREMENT_CYCLE_CLOCK";      ADDR $A25C; };
+LABEL { NAME "UTIL_RESET_VIA_PERIPHERALS";      ADDR $A9C7; };
+LABEL { NAME "UTIL_TEST_MEM_NYBBLE_BLOCK";      ADDR $A369; };
+LABEL { NAME "UTIL_SPLIT_BYTE_TO_SCREEN_CODES"; ADDR $AAC1; };
+LABEL { NAME "UTIL_WRITE_INDIRECT_CHAR";        ADDR $AACF; };
+LABEL { NAME "UTIL_HEX_CONVERT_AND_CLEAN";      ADDR $AB85; };
+LABEL { NAME "UTIL_HEX_CONVERT_PRESERVE_REG";   ADDR $AB8A; };
+LABEL { NAME "UTIL_PRINT_CHAR_REVERSE_MODE";    ADDR $ABAA; };
+LABEL { NAME "UTIL_REFRESH_VIC_COLOR_BARS";     ADDR $A925; };
+LABEL { NAME "UTIL_VALIDATE_HARDWARE_TIMING";   ADDR $AADD; };
