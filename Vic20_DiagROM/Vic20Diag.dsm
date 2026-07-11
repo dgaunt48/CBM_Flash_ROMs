@@ -1,5 +1,5 @@
 ; da65 V2.19 - Git cc3c40c
-; Created:    2026-07-11 14:16:16
+; Created:    2026-07-11 16:25:14
 ; Input file: vc-20-diag.324173-01_blk5.bin
 ; Page:       1
 
@@ -114,7 +114,7 @@ LA020:  lda     VIC_INIT_REG_MATRIX,x
         sta     $9800
         sta     $0411
         ldx     #$0E
-LA033:  lda     LA27A,x
+LA033:  lda     STR_CYCLE_PTR,x
         sta     $0400,x
         dex
         bpl     LA033
@@ -150,11 +150,10 @@ LA077:  lda     STR_SPLASH_ZERO_PAGE,x
         dex
         bpl     LA077
         ldy     #$00
-TEST_PHASE_RAM:
-        tya
+LA082:  tya
         sta     $00,y
         iny
-        bne     TEST_PHASE_RAM
+        bne     LA082
         ldy     #$00
 LA08B:  tya
         eor     $00,y
@@ -314,12 +313,12 @@ TEST_PHASE_MANAGER:
         sta     ZP_DIAG_SYSTEM_FLG
         lda     #$07
         sta     ZP_DIAG_CHECKPOINT_CTR
-        jsr     INIT_MAP_MEMORY_BOUNDS
+        jsr     UTIL_TEST_SYSTEM_RAM_BASE
         jsr     INIT_HOOK_SYSTEM_IRQ
         lda     #$0A
         sta     ZP_DIAG_CHECKPOINT_CTR
         sei
-        jsr     INIT_MAP_EXPANSION_BOUNDS
+        jsr     UTIL_TEST_SYSTEM_RAM_EXPANSION
         cli
         jsr     UTIL_HARDWARE_DELAY
         jsr     UTIL_HARDWARE_DELAY
@@ -365,17 +364,18 @@ LA272:  ldx     #$00
         jsr     UTIL_PRINT_STRING_INVERTED
         rts
 
-LA27A:  .byte   " CYCLE 000000"
+STR_CYCLE_PTR:
+        .byte   " CYCLE 000000"
 
         .byte   $0D,$00
-INIT_MAP_MEMORY_BOUNDS:
+UTIL_TEST_SYSTEM_RAM_BASE:
         lda     #$01
         pha
         ldx     #$00
         ldy     #$02
         lda     #$01
         bne     LA29D
-INIT_MAP_EXPANSION_BOUNDS:
+UTIL_TEST_SYSTEM_RAM_EXPANSION:
         lda     #$02
         pha
         ldx     #$00
@@ -501,7 +501,7 @@ LA378:  txa
         sta     $1C
         pla
         eor     $1C
-        bne     TEST_PHASE_COLOR_RAM
+        bne     ERR_TRAP_COLOR_RAM
         dex
         bpl     LA378
         lda     $00
@@ -513,7 +513,7 @@ LA378:  txa
         bpl     LA372
         jmp     UTIL_PRINT_PASS_STATUS
 
-TEST_PHASE_COLOR_RAM:
+ERR_TRAP_COLOR_RAM:
         lda     #$22
         jsr     LAC27
 LA39F:  clc
@@ -1168,7 +1168,7 @@ UTIL_INITIALIZE_VIA_TIMING_RUNS:
         sta     (ZP_VIC_REG_PTR_LO),y
         rts
 
-VIC_TABLE_NTSC_GEOMETRY:
+VIA_TABLE_HARDWARE_STIMULI:
         .byte   $00,$80,$C0,$E0,$0C,$C0,$FF,$FF
         .byte   $FF,$FF
 VIA_TABLE_PCR_EDGE_CONFIGS:
@@ -1186,10 +1186,10 @@ VIA_TABLE_TARGET_REG_OFFSETS:
 VIA_TABLE_SHIFT_REG_SYNCS:
         .byte   $00,$00,$00,$00,$00,$00,$FF,$00
         .byte   $FF,$00
-VIC_TABLE_ROW_SPACERS_A:
+VIA_TABLE_REF_CLOCK_LO:
         .byte   $00,$00,$00,$00,$00,$00,$3A,$3A
         .byte   $3A,$3A
-VIC_TABLE_ROW_SPACERS_B:
+VIA_TABLE_REF_CLOCK_HI:
         .byte   $00,$00,$00,$00,$00,$00,$33,$33
         .byte   $33,$33
 UTIL_RESET_VIA_PERIPHERALS:
@@ -1351,7 +1351,7 @@ UTIL_VALIDATE_HARDWARE_TIMING:
         lda     #$00
         adc     ZP_VIC_REG_PTR_HI
         sta     ZP_PTR_INDIRECT_A_HI
-        lda     VIC_TABLE_NTSC_GEOMETRY,x
+        lda     VIA_TABLE_HARDWARE_STIMULI,x
         ldy     #$00
         jsr     UTIL_WRITE_INDIRECT_CHAR
         lda     ZP_INT_TRIGGERED_FLG
@@ -1363,11 +1363,11 @@ LAB0B:  ldy     #$00
         sty     ZP_INT_EXPECTED_FLG
         ldy     ZP_STRING_SELECT_IDX
         stx     ZP_TEMP_STRING_LEN
-        lda     VIC_TABLE_ROW_SPACERS_A,y
+        lda     VIA_TABLE_REF_CLOCK_LO,y
         sec
         sbc     ZP_TIME_ELAPSED_LO
         sta     ZP_TEMP_CHAR_DATA
-        lda     VIC_TABLE_ROW_SPACERS_B,y
+        lda     VIA_TABLE_REF_CLOCK_HI,y
         sbc     ZP_TIME_ELAPSED_HI
         bpl     LAB32
         eor     #$FF
