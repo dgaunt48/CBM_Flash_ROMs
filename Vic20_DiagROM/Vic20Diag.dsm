@@ -1,5 +1,5 @@
 ; da65 V2.19 - Git cc3c40c
-; Created:    2026-07-11 02:21:13
+; Created:    2026-07-11 16:25:14
 ; Input file: vc-20-diag.324173-01_blk5.bin
 ; Page:       1
 
@@ -13,11 +13,13 @@ ZP_PTR_INDIRECT_B_HI:= $0007
 ZP_TEMP_CHAR_DATA:= $0008
 ZP_TEMP_STRING_LEN:= $0009
 ZP_SCREEN_SCROLL_FLG:= $000B
-ZP_SAVED_REG_C  := $000C
-ZP_SAVED_REG_D  := $000D
-ZP_SAVED_REG_E  := $000E
-ZP_SAVED_REG_F  := $000F
+ZP_TIME_ELAPSED_LO:= $000C
+ZP_TIME_ELAPSED_HI:= $000D
+ZP_INT_EXPECTED_FLG:= $000E
+ZP_INT_TRIGGERED_FLG:= $000F
 ZP_SCREEN_BUF_POS:= $0010
+ZP_STRING_TEMP_LO:= $0013
+ZP_STRING_TEMP_HI:= $0014
 ZP_PORT_LINE_OFFSET:= $0015
 ZP_STRING_SELECT_IDX:= $0016
 ZP_MATRIX_SCAN_CTR:= $0017
@@ -26,10 +28,10 @@ ZP_LOOP_LIMIT_CTR:= $0019
 ZP_VIC_REG_PTR_LO:= $001A
 ZP_VIC_REG_PTR_HI:= $001B
 ZP_DIAG_SYSTEM_FLG:= $001D
-ZP_RAM_SIZE_PTR_A_LO:= $001E
-ZP_RAM_SIZE_PTR_A_HI:= $001F
-ZP_RAM_SIZE_PTR_B_LO:= $0020
-ZP_RAM_SIZE_PTR_B_HI:= $0021
+ZP_PTR_COLOR_RAM_LO:= $001E
+ZP_PTR_COLOR_RAM_HI:= $001F
+ZP_PTR_SCREEN_RAM_LO:= $0020
+ZP_PTR_SCREEN_RAM_HI:= $0021
 ZP_AUDIO_FREQ_LO:= $0022
 ZP_AUDIO_FREQ_HI:= $0023
 ZP_LOOP_PASS_CTR:= $0025
@@ -112,7 +114,7 @@ LA020:  lda     VIC_INIT_REG_MATRIX,x
         sta     $9800
         sta     $0411
         ldx     #$0E
-LA033:  lda     LA27A,x
+LA033:  lda     STR_CYCLE_PTR,x
         sta     $0400,x
         dex
         bpl     LA033
@@ -148,11 +150,10 @@ LA077:  lda     STR_SPLASH_ZERO_PAGE,x
         dex
         bpl     LA077
         ldy     #$00
-TEST_PHASE_RAM:
-        tya
+LA082:  tya
         sta     $00,y
         iny
-        bne     TEST_PHASE_RAM
+        bne     LA082
         ldy     #$00
 LA08B:  tya
         eor     $00,y
@@ -312,12 +313,12 @@ TEST_PHASE_MANAGER:
         sta     ZP_DIAG_SYSTEM_FLG
         lda     #$07
         sta     ZP_DIAG_CHECKPOINT_CTR
-        jsr     INIT_MAP_MEMORY_BOUNDS
+        jsr     UTIL_TEST_SYSTEM_RAM_BASE
         jsr     INIT_HOOK_SYSTEM_IRQ
         lda     #$0A
         sta     ZP_DIAG_CHECKPOINT_CTR
         sei
-        jsr     INIT_MAP_EXPANSION_BOUNDS
+        jsr     UTIL_TEST_SYSTEM_RAM_EXPANSION
         cli
         jsr     UTIL_HARDWARE_DELAY
         jsr     UTIL_HARDWARE_DELAY
@@ -360,20 +361,21 @@ LA25E:  inc     RAM_CYCLE_CLOCK_BUFFER,x
         bmi     UTIL_INCREMENT_CYCLE_CLOCK
 LA272:  ldx     #$00
         ldy     #$04
-        jsr     LAC6D
+        jsr     UTIL_PRINT_STRING_INVERTED
         rts
 
-LA27A:  .byte   " CYCLE 000000"
+STR_CYCLE_PTR:
+        .byte   " CYCLE 000000"
 
         .byte   $0D,$00
-INIT_MAP_MEMORY_BOUNDS:
+UTIL_TEST_SYSTEM_RAM_BASE:
         lda     #$01
         pha
         ldx     #$00
         ldy     #$02
         lda     #$01
         bne     LA29D
-INIT_MAP_EXPANSION_BOUNDS:
+UTIL_TEST_SYSTEM_RAM_EXPANSION:
         lda     #$02
         pha
         ldx     #$00
@@ -499,7 +501,7 @@ LA378:  txa
         sta     $1C
         pla
         eor     $1C
-        bne     TEST_PHASE_COLOR_RAM
+        bne     ERR_TRAP_COLOR_RAM
         dex
         bpl     LA378
         lda     $00
@@ -511,7 +513,7 @@ LA378:  txa
         bpl     LA372
         jmp     UTIL_PRINT_PASS_STATUS
 
-TEST_PHASE_COLOR_RAM:
+ERR_TRAP_COLOR_RAM:
         lda     #$22
         jsr     LAC27
 LA39F:  clc
@@ -861,30 +863,31 @@ TEST_PORT_USER_PORT:
         jsr     UTIL_PRINT_STRING
         lda     VIA1_PORT_B
         cmp     #$FF
-        bne     LA6D2
+        bne     ERR_TRAP_USER_PORT_FAIL
         lda     #$00
         sta     VIA1_PORT_B
         lda     VIA1_PORT_B
-        bne     LA6D2
+        bne     ERR_TRAP_USER_PORT_FAIL
         lda     #$55
         sta     VIA1_DDR_B
         sta     VIA1_PORT_B
         lda     VIA1_PORT_B
         cmp     #$FF
-        bne     LA6D2
+        bne     ERR_TRAP_USER_PORT_FAIL
         lda     #$00
         sta     VIA1_PORT_B
         lda     VIA1_PORT_B
-        bne     LA6D2
+        bne     ERR_TRAP_USER_PORT_FAIL
         jsr     UTIL_PRINT_PASS_STATUS
         rts
 
-LA6D2:  jsr     UTIL_FLASH_ERROR_HANDLER
+ERR_TRAP_USER_PORT_FAIL:
+        jsr     UTIL_FLASH_ERROR_HANDLER
         lda     #$FF
         sta     VIA1_PORT_B
         lda     #$00
         sta     VIA1_PORT_B
-        jmp     LA6D2
+        jmp     ERR_TRAP_USER_PORT_FAIL
 
 TEST_PHASE_VIA_EDGE_CHECKS:
         lda     #$10
@@ -908,7 +911,7 @@ LA6FF:  lda     ZP_STRING_SELECT_IDX
         lda     LA749,x
         tax
         jsr     UTIL_PRINT_STRING
-        jsr     UTIL_REFRESH_VIC_COLOR_BARS
+        jsr     UTIL_INITIALIZE_VIA_TIMING_RUNS
         jsr     UTIL_VALIDATE_HARDWARE_TIMING
         inc     ZP_STRING_SELECT_IDX
         dec     ZP_LOOP_LIMIT_CTR
@@ -927,7 +930,7 @@ LA728:  lda     ZP_STRING_SELECT_IDX
         ldy     LA749+1,x
         tax
         jsr     UTIL_PRINT_STRING
-        jsr     UTIL_REFRESH_VIC_COLOR_BARS
+        jsr     UTIL_INITIALIZE_VIA_TIMING_RUNS
         cli
         jsr     UTIL_VALIDATE_HARDWARE_TIMING
         inc     ZP_STRING_SELECT_IDX
@@ -1003,15 +1006,15 @@ LA817:  txa
         ldx     #$02
 LA836:  ldy     #$FF
 LA838:  lda     #$A0
-        sta     (ZP_RAM_SIZE_PTR_B_LO),y
+        sta     (ZP_PTR_SCREEN_RAM_LO),y
         lda     #$06
-        sta     (ZP_RAM_SIZE_PTR_A_LO),y
+        sta     (ZP_PTR_COLOR_RAM_LO),y
         dey
         dey
         cpy     #$FF
         bne     LA838
-        inc     ZP_RAM_SIZE_PTR_B_HI
-        inc     ZP_RAM_SIZE_PTR_A_HI
+        inc     ZP_PTR_SCREEN_RAM_HI
+        inc     ZP_PTR_COLOR_RAM_HI
         dex
         bne     LA836
         ldx     #$07
@@ -1031,13 +1034,13 @@ LA85E:  jsr     LA8D3
         bcs     LA85E
         inc     ZP_AUDIO_FREQ_LO
         bne     LA85E
-LA86F:  inc     ZP_RAM_SIZE_PTR_B_HI
-        inc     ZP_RAM_SIZE_PTR_A_HI
+LA86F:  inc     ZP_PTR_SCREEN_RAM_HI
+        inc     ZP_PTR_COLOR_RAM_HI
         ldy     #$00
 LA875:  lda     #$A0
-        sta     (ZP_RAM_SIZE_PTR_B_LO),y
+        sta     (ZP_PTR_SCREEN_RAM_LO),y
         lda     ZP_AUDIO_FREQ_LO
-        sta     (ZP_RAM_SIZE_PTR_A_LO),y
+        sta     (ZP_PTR_COLOR_RAM_LO),y
         iny
         cpy     #$02
         bne     LA875
@@ -1082,9 +1085,9 @@ LA8BA:  lda     #$06
 
 LA8D3:  ldy     ZP_AUDIO_FREQ_HI
 LA8D5:  lda     #$A0
-        sta     (ZP_RAM_SIZE_PTR_B_LO),y
+        sta     (ZP_PTR_SCREEN_RAM_LO),y
         lda     ZP_AUDIO_FREQ_LO
-        sta     (ZP_RAM_SIZE_PTR_A_LO),y
+        sta     (ZP_PTR_COLOR_RAM_LO),y
         tya
         clc
         adc     #$16
@@ -1094,29 +1097,29 @@ LA8D5:  lda     #$A0
         rts
 
 LA8E7:  lda     #$00
-        sta     ZP_RAM_SIZE_PTR_B_LO
+        sta     ZP_PTR_SCREEN_RAM_LO
         lda     #$1E
-        sta     ZP_RAM_SIZE_PTR_B_HI
+        sta     ZP_PTR_SCREEN_RAM_HI
         lda     #$00
-        sta     ZP_RAM_SIZE_PTR_A_LO
+        sta     ZP_PTR_COLOR_RAM_LO
         lda     #$96
-        sta     ZP_RAM_SIZE_PTR_A_HI
+        sta     ZP_PTR_COLOR_RAM_HI
         ldx     #$02
 LA8F9:  ldy     #$00
 LA8FB:  lda     #$20
-        sta     (ZP_RAM_SIZE_PTR_B_LO),y
+        sta     (ZP_PTR_SCREEN_RAM_LO),y
         lda     #$01
-        sta     (ZP_RAM_SIZE_PTR_A_LO),y
+        sta     (ZP_PTR_COLOR_RAM_LO),y
         iny
         bne     LA8FB
-        inc     ZP_RAM_SIZE_PTR_B_HI
-        inc     ZP_RAM_SIZE_PTR_A_HI
+        inc     ZP_PTR_SCREEN_RAM_HI
+        inc     ZP_PTR_COLOR_RAM_HI
         dex
         bne     LA8F9
-        dec     ZP_RAM_SIZE_PTR_B_HI
-        dec     ZP_RAM_SIZE_PTR_B_HI
-        dec     ZP_RAM_SIZE_PTR_A_HI
-        dec     ZP_RAM_SIZE_PTR_A_HI
+        dec     ZP_PTR_SCREEN_RAM_HI
+        dec     ZP_PTR_SCREEN_RAM_HI
+        dec     ZP_PTR_COLOR_RAM_HI
+        dec     ZP_PTR_COLOR_RAM_HI
         rts
 
 STR_SOUND_TEST_PTR:
@@ -1124,7 +1127,7 @@ STR_SOUND_TEST_PTR:
         .byte   " SOUND TEST:"
 
         .byte   $0D,$00
-UTIL_REFRESH_VIC_COLOR_BARS:
+UTIL_INITIALIZE_VIA_TIMING_RUNS:
         inc     ZP_DIAG_CHECKPOINT_CTR
         lda     #$7F
         ldy     #$0E
@@ -1133,10 +1136,10 @@ UTIL_REFRESH_VIC_COLOR_BARS:
         lda     (ZP_VIC_REG_PTR_LO),y
         sta     (ZP_VIC_REG_PTR_LO),y
         ldx     ZP_STRING_SELECT_IDX
-        ldy     VIC_TABLE_REG_OFFSETS,x
-        lda     VIC_TABLE_PAL_GEOMETRY,x
+        ldy     VIA_TABLE_TARGET_REG_OFFSETS,x
+        lda     VIA_TABLE_PCR_EDGE_CONFIGS,x
         sta     (ZP_VIC_REG_PTR_LO),y
-        lda     VIC_TABLE_SCREEN_COLS,x
+        lda     VIA_TABLE_ACR_TIMER_MODES,x
         ldy     #$0C
         sta     (ZP_VIC_REG_PTR_LO),y
         lda     #$00
@@ -1155,38 +1158,38 @@ UTIL_REFRESH_VIC_COLOR_BARS:
         ldy     #$09
         sta     (ZP_VIC_REG_PTR_LO),y
         ldy     #$0B
-        lda     VIC_TABLE_SYNC_MARKERS,x
+        lda     VIA_TABLE_SHIFT_REG_SYNCS,x
         sta     (ZP_VIC_REG_PTR_LO),y
         ldy     #$0D
         lda     (ZP_VIC_REG_PTR_LO),y
         sta     (ZP_VIC_REG_PTR_LO),y
         ldy     #$0E
-        lda     VIC_TABLE_AUDIO_VOICES,x
+        lda     VIA_TABLE_IER_INT_MASKS,x
         sta     (ZP_VIC_REG_PTR_LO),y
         rts
 
-VIC_TABLE_NTSC_GEOMETRY:
+VIA_TABLE_HARDWARE_STIMULI:
         .byte   $00,$80,$C0,$E0,$0C,$C0,$FF,$FF
         .byte   $FF,$FF
-VIC_TABLE_PAL_GEOMETRY:
+VIA_TABLE_PCR_EDGE_CONFIGS:
         .byte   $80,$00,$E0,$C0,$0E,$0C,$FF,$FF
         .byte   $FF,$FF
-VIC_TABLE_SCREEN_COLS:
+VIA_TABLE_ACR_TIMER_MODES:
         .byte   $01,$00,$10,$00,$40,$20,$00,$00
         .byte   $00,$00
-VIC_TABLE_AUDIO_VOICES:
+VIA_TABLE_IER_INT_MASKS:
         .byte   $82,$82,$90,$90,$88,$88,$C0,$A0
         .byte   $C0,$A0
-VIC_TABLE_REG_OFFSETS:
+VIA_TABLE_TARGET_REG_OFFSETS:
         .byte   $0F,$0F,$1C,$1C,$1C,$1C,$05,$09
         .byte   $05,$09
-VIC_TABLE_SYNC_MARKERS:
+VIA_TABLE_SHIFT_REG_SYNCS:
         .byte   $00,$00,$00,$00,$00,$00,$FF,$00
         .byte   $FF,$00
-VIC_TABLE_ROW_SPACERS_A:
+VIA_TABLE_REF_CLOCK_LO:
         .byte   $00,$00,$00,$00,$00,$00,$3A,$3A
         .byte   $3A,$3A
-VIC_TABLE_ROW_SPACERS_B:
+VIA_TABLE_REF_CLOCK_HI:
         .byte   $00,$00,$00,$00,$00,$00,$33,$33
         .byte   $33,$33
 UTIL_RESET_VIA_PERIPHERALS:
@@ -1335,37 +1338,37 @@ LAAD5:  adc     #$01
 
 UTIL_VALIDATE_HARDWARE_TIMING:
         lda     #$00
-        sta     ZP_SAVED_REG_D
-        sta     ZP_SAVED_REG_C
-        sta     ZP_SAVED_REG_F
+        sta     ZP_TIME_ELAPSED_HI
+        sta     ZP_TIME_ELAPSED_LO
+        sta     ZP_INT_TRIGGERED_FLG
         lda     #$FF
-        sta     ZP_SAVED_REG_E
+        sta     ZP_INT_EXPECTED_FLG
         ldx     ZP_STRING_SELECT_IDX
-        lda     VIC_TABLE_REG_OFFSETS,x
+        lda     VIA_TABLE_TARGET_REG_OFFSETS,x
         clc
         adc     ZP_VIC_REG_PTR_LO
         sta     ZP_PTR_INDIRECT_A_LO
         lda     #$00
         adc     ZP_VIC_REG_PTR_HI
         sta     ZP_PTR_INDIRECT_A_HI
-        lda     VIC_TABLE_NTSC_GEOMETRY,x
+        lda     VIA_TABLE_HARDWARE_STIMULI,x
         ldy     #$00
         jsr     UTIL_WRITE_INDIRECT_CHAR
-        lda     ZP_SAVED_REG_F
+        lda     ZP_INT_TRIGGERED_FLG
         bne     LAB0B
 LAB05:  jsr     UTIL_FLASH_ERROR_HANDLER
         jmp     LAB05
 
 LAB0B:  ldy     #$00
-        sty     ZP_SAVED_REG_E
+        sty     ZP_INT_EXPECTED_FLG
         ldy     ZP_STRING_SELECT_IDX
         stx     ZP_TEMP_STRING_LEN
-        lda     VIC_TABLE_ROW_SPACERS_A,y
+        lda     VIA_TABLE_REF_CLOCK_LO,y
         sec
-        sbc     ZP_SAVED_REG_C
+        sbc     ZP_TIME_ELAPSED_LO
         sta     ZP_TEMP_CHAR_DATA
-        lda     VIC_TABLE_ROW_SPACERS_B,y
-        sbc     ZP_SAVED_REG_D
+        lda     VIA_TABLE_REF_CLOCK_HI,y
+        sbc     ZP_TIME_ELAPSED_HI
         bpl     LAB32
         eor     #$FF
         tax
@@ -1397,11 +1400,11 @@ VIA_EDGE_NMI_HANDLER:
         tya
         pha
 VIA_EDGE_IRQ_HANDLER:
-        lda     ZP_SAVED_REG_E
+        lda     ZP_INT_EXPECTED_FLG
         beq     ERR_HANDLER_CATASTROPHIC_IRQ
-        sta     ZP_SAVED_REG_F
+        sta     ZP_INT_TRIGGERED_FLG
         ldy     ZP_STRING_SELECT_IDX
-        lda     VIC_TABLE_AUDIO_VOICES,y
+        lda     VIA_TABLE_IER_INT_MASKS,y
         and     #$7F
         ldy     #$0D
         and     (ZP_VIC_REG_PTR_LO),y
@@ -1413,11 +1416,11 @@ VIA_EDGE_IRQ_HANDLER:
         sta     (ZP_VIC_REG_PTR_LO),y
         pla
         tay
-        sty     ZP_SAVED_REG_D
+        sty     ZP_TIME_ELAPSED_HI
         pla
         tax
         pla
-        sta     ZP_SAVED_REG_C
+        sta     ZP_TIME_ELAPSED_LO
         rti
 
 ERR_HANDLER_CATASTROPHIC_IRQ:
@@ -1554,17 +1557,18 @@ LAC4F:  lda     ($11),y
         rts
 
 UTIL_PRINT_STRING:
-        stx     $13
-        sty     $14
+        stx     ZP_STRING_TEMP_LO
+        sty     ZP_STRING_TEMP_HI
         ldy     #$00
-LAC62:  lda     ($13),y
+LAC62:  lda     (ZP_STRING_TEMP_LO),y
         beq     LAC6C
         jsr     UTIL_PRINT_CHAR
         iny
         bne     LAC62
 LAC6C:  rts
 
-LAC6D:  lda     #$80
+UTIL_PRINT_STRING_INVERTED:
+        lda     #$80
         sta     ZP_SCREEN_BUF_POS
         jsr     UTIL_PRINT_STRING
         lda     #$00
