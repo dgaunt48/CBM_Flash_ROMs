@@ -20,7 +20,8 @@ of my 16Bit Flash ROM Adaptor board.
 Raspberry PI Pico code used to program the SPI Flash ROM on my FPGA boards.
 
 ## Vic20_DiagROM
-Dissassembly of vc-20-diag.324173-01_blk5.bin with partial comments.
+Dissassembly of vc-20-diag.324173-01_blk5.bin.
+Source file now assembles back into an identical image of the original Diag ROM file.
 
 ## Vic20_FlashCart
 Vic20 Ram Expansion and Multi ROM Image Flash Cartridge.
