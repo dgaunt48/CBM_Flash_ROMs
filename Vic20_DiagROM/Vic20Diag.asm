@@ -633,16 +633,24 @@ LA490:  jsr     UTIL_FLASH_ERROR_HANDLER
         jmp     LA490
 
 TEST_VIA_EDGE_IRQ_SETUP:
-        sei
-        lda     #$4D
-        sta     RAM_IRQ_VECTOR_LO
-        lda     #$AB
-        sta     RAM_IRQ_VECTOR_HI
-        lda     #$48
-        sta     RAM_NMI_VECTOR_LO
-        lda     #$AB
-        sta     RAM_NMI_VECTOR_HI
-        rts
+        ; --- CRITICAL SECTION ENTRY ---
+        sei                             ; Set Interrupt Disable (Inhibits standard maskable IRQs)
+                                        ; Prevents an IRQ from firing mid-setup while vectors are half-written.
+
+        ; --- PATCH HARDWARE IRQ VECTOR ---
+        lda     #<VIA_EDGE_IRQ_HANDLER  ; Extract low byte of the Edge IRQ Handler address
+        sta     RAM_IRQ_VECTOR_LO       ; Inject into the low-byte RAM destination ($0314)
+        lda     #>VIA_EDGE_IRQ_HANDLER  ; Extract high byte of the Edge IRQ Handler address
+        sta     RAM_IRQ_VECTOR_HI       ; Inject into the high-byte RAM destination ($0315)
+
+        ; --- PATCH HARDWARE NMI VECTOR ---
+        lda     #<VIA_EDGE_NMI_HANDLER  ; Extract low byte of the Edge NMI Handler address
+        sta     RAM_NMI_VECTOR_LO       ; Inject into the low-byte RAM destination ($0318)
+        lda     #>VIA_EDGE_NMI_HANDLER  ; Extract high byte of the Edge NMI Handler address
+        sta     RAM_NMI_VECTOR_HI       ; Inject into the high-byte RAM destination ($0319)
+
+        ; --- EXIT AND RETURN ---
+        rts                             ; Return from Subroutine (leaves IRQs disabled for caller control)
 
 STR_KEYBOARD_TEST_PTR:
         .byte   " KEYBOARD TEST: "
@@ -671,313 +679,369 @@ STR_JOYSTICK_PORT_PTR:
         .byte   $00
 TEST_PORT_IEC_SERIAL:
         lda     #$7F
-        sta     VIA1_INT_ENABLE
-        sta     VIA2_INT_ENABLE
+        sta     VIA1_INT_ENABLE                 ; Disable All Interrupts
+        sta     VIA2_INT_ENABLE                 ; For Both VIA's
         lda     #$80
-        sta     VIA1_DDR_A
+        sta     VIA1_DDR_A                      ; User Port VIA Port A Bit 7 To Output
         lda     #$CC
-        sta     VIA2_PER_CTRL
+        sta     VIA2_PER_CTRL                   ; Keyboard VIA CA2 & CB2 Output LOW
         lda     #$EE
-        sta     VIA1_PER_CTRL
+        sta     VIA1_PER_CTRL                   ; User Port VIA CA2 & CB2 Output HIGH
         lda     #$00
-        sta     VIA1_PORT_A_NH
-        ldx     #$D6
-        ldy     #$A4
-        inc     ZP_DIAG_CHECKPOINT_CTR
-        jsr     UTIL_PRINT_STRING
-        lda     VIA1_PORT_A_NH
-        lsr     a
-        bcc     ERR_TRAP_IEC_SERIAL_FAIL_B
-        lsr     a
-        bcc     ERR_TRAP_IEC_SERIAL_FAIL_A
+        sta     VIA1_PORT_A_NH                  ; User Port VIA Port A Bit 7 Low / Rest Inputs
+
+        ldx     #<STR_SERIAL_BUS_PTR            ; Write The String "SERIAL BUS"
+        ldy     #>STR_SERIAL_BUS_PTR
+        inc     ZP_DIAG_CHECKPOINT_CTR          ; Advance diagnostic stage counter
+        jsr     UTIL_PRINT_STRING               ; Display current test on screen
+
+        lda     VIA1_PORT_A_NH                  ; Read serial bus lines via VIA1 Port A
+        lsr     a                               ; Shift Bit 0 into Carry flag
+        bcc     ERR_TRAP_IEC_SERIAL_FAIL_B      ; Fail if Bit 0 is clear (low)
+        lsr     a                               ; Shift Bit 1 into Carry flag
+        bcc     ERR_TRAP_IEC_SERIAL_FAIL_A      ; Fail if Bit 1 is clear (low)
+        
         lda     #$EC
-        sta     VIA2_PER_CTRL
-        lda     VIA1_PORT_A_NH
-        lsr     a
-        bcc     ERR_TRAP_IEC_SERIAL_FAIL_B
-        lsr     a
-        bcs     ERR_TRAP_IEC_SERIAL_FAIL_A
+        sta     VIA2_PER_CTRL                   ; Keyboard VIA: Set CB2 High, CA2 Low
+        lda     VIA1_PORT_A_NH                  ; Re-read serial bus input state
+        lsr     a                               ; Shift Bit 0 into Carry flag
+        bcc     ERR_TRAP_IEC_SERIAL_FAIL_B      ; Fail if Bit 0 is clear (low)
+        lsr     a                               ; Shift Bit 1 into Carry flag
+        bcs     ERR_TRAP_IEC_SERIAL_FAIL_A      ; Fail if Bit 1 is set (high)
+        
         lda     #$CE
-        sta     VIA2_PER_CTRL
-        lda     VIA1_PORT_A_NH
-        lsr     a
-        bcs     ERR_TRAP_IEC_SERIAL_FAIL_B
-        lsr     a
-        bcc     ERR_TRAP_IEC_SERIAL_FAIL_A
+        sta     VIA2_PER_CTRL                   ; Keyboard VIA: Set CB2 Low, CA2 High
+        lda     VIA1_PORT_A_NH                  ; Re-read serial bus input state
+        lsr     a                               ; Shift Bit 0 into Carry flag
+        bcs     ERR_TRAP_IEC_SERIAL_FAIL_B      ; Fail if Bit 0 is set (high)
+        lsr     a                               ; Shift Bit 1 into Carry flag
+        bcc     ERR_TRAP_IEC_SERIAL_FAIL_A      ; Fail if Bit 1 is clear (low)
+        
         lda     VIA2_INT_FLAGS
-        sta     VIA2_INT_FLAGS
+        sta     VIA2_INT_FLAGS                  ; Clear VIA2 interrupt flags by writing back
         lda     #$CC
-        sta     VIA2_PER_CTRL
+        sta     VIA2_PER_CTRL                   ; Keyboard VIA: Reset CA2 & CB2 to Low
         lda     #$80
-        sta     VIA1_PORT_A_NH
+        sta     VIA1_PORT_A_NH                  ; Pull User Port Bit 7 High
+        lda     VIA2_INT_FLAGS                  ; Read VIA2 Interrupt Flag Register
+        and     #$10                            ; Mask for Bit 4 (CB1 Active Edge flag)
+        beq     ERR_TRAP_IEC_SERIAL_FAIL_C      ; Fail if CB1 transition was not detected
+        
         lda     VIA2_INT_FLAGS
-        and     #$10
-        beq     ERR_TRAP_IEC_SERIAL_FAIL_C
-        lda     VIA2_INT_FLAGS
-        sta     VIA2_INT_FLAGS
+        sta     VIA2_INT_FLAGS                  ; Clear VIA2 interrupt flags again
         lda     #$DC
-        sta     VIA2_PER_CTRL
+        sta     VIA2_PER_CTRL                   ; Keyboard VIA: Set CB2 High, CA2 Low (Alternative configuration)
         lda     #$00
-        sta     VIA1_PORT_A_NH
-        lda     VIA2_INT_FLAGS
-        and     #$10
-        beq     ERR_TRAP_IEC_SERIAL_FAIL_C
-        jsr     UTIL_PRINT_PASS_STATUS
-        jmp     TEST_PORT_CASSETTE
+        sta     VIA1_PORT_A_NH                  ; Pull User Port Bit 7 Low
+        lda     VIA2_INT_FLAGS                  ; Re-read VIA2 Interrupt Flag Register
+        and     #$10                            ; Mask for Bit 4 (CB1 Active Edge flag)
+        beq     ERR_TRAP_IEC_SERIAL_FAIL_C      ; Fail if CB1 transition failed to trigger
+        
+        jsr     UTIL_PRINT_PASS_STATUS          ; Print "OK" or green status message
+        jmp     TEST_PORT_CASSETTE              ; Proceed to the next test
 
 ERR_TRAP_IEC_SERIAL_FAIL_A:
-        jsr     UTIL_FLASH_ERROR_HANDLER
+        jsr     UTIL_FLASH_ERROR_HANDLER        ; Trigger visual error signal (e.g., screen flash)
         lda     #$EC
-        sta     VIA2_PER_CTRL
+        sta     VIA2_PER_CTRL                   ; Toggle control lines to keep signal active
         lda     #$CC
-        sta     VIA2_PER_CTRL
-        jmp     ERR_TRAP_IEC_SERIAL_FAIL_A
+        sta     VIA2_PER_CTRL                   ; Reset control lines
+        jmp     ERR_TRAP_IEC_SERIAL_FAIL_A      ; Infinite trap loop for failure type A
 
 ERR_TRAP_IEC_SERIAL_FAIL_B:
-        jsr     UTIL_FLASH_ERROR_HANDLER
+        jsr     UTIL_FLASH_ERROR_HANDLER        ; Trigger visual error signal
         lda     #$CE
-        sta     VIA2_PER_CTRL
+        sta     VIA2_PER_CTRL                   ; Toggle control lines differently for fault B
         lda     #$CC
-        sta     VIA2_PER_CTRL
-        jmp     ERR_TRAP_IEC_SERIAL_FAIL_B
+        sta     VIA2_PER_CTRL                   ; Reset control lines
+        jmp     ERR_TRAP_IEC_SERIAL_FAIL_B      ; Infinite trap loop for failure type B
 
 ERR_TRAP_IEC_SERIAL_FAIL_C:
-        jsr     UTIL_FLASH_ERROR_HANDLER
+        jsr     UTIL_FLASH_ERROR_HANDLER        ; Trigger visual error signal
         lda     #$80
-        sta     VIA1_PORT_A_NH
+        sta     VIA1_PORT_A_NH                  ; Toggle output line High for fault C monitoring
         lda     #$00
-        sta     VIA1_PORT_A_NH
-        jmp     ERR_TRAP_IEC_SERIAL_FAIL_C
+        sta     VIA1_PORT_A_NH                  ; Reset output line Low
+        jmp     ERR_TRAP_IEC_SERIAL_FAIL_C      ; Infinite trap loop for failure type C
 
 TEST_PORT_CASSETTE:
+        ; --- HARDWARE INITIALIZATION PHASE ---
         lda     #$FF
-        sta     VIA2_PORT_B
+        sta     VIA2_PORT_B                     ; Drive all Keyboard VIA Port B pins HIGH (resets lines)
         lda     #$CC
-        sta     VIA2_PER_CTRL
+        sta     VIA2_PER_CTRL                   ; Keyboard VIA PCR: Set CA2 & CB2 Outputs LOW
         lda     #$CE
-        sta     VIA1_PER_CTRL
+        sta     VIA1_PER_CTRL                   ; User Port VIA PCR: Set CB2 Low, CA2 High
         lda     #$80
-        sta     VIA1_PORT_A_NH
-        ldx     #$E7
-        ldy     #$A4
-        inc     ZP_DIAG_CHECKPOINT_CTR
-        jsr     UTIL_PRINT_STRING
-        lda     VIA2_INT_FLAGS
-        sta     VIA2_INT_FLAGS
-        lda     VIA1_PORT_A_NH
-        and     #$40
-        bne     ERR_TRAP_CASSETTE_FAIL_A
-        lda     #$CC
-        sta     VIA1_PER_CTRL
-        jsr     UTIL_HARDWARE_DELAY
-        lda     VIA1_PORT_A_NH
-        and     #$40
-        beq     ERR_TRAP_CASSETTE_FAIL_A
-        lda     #$00
-        sta     VIA2_PORT_B
-        lda     VIA2_INT_FLAGS
-        and     #$02
-        beq     ERR_TRAP_CASSETTE_FAIL_B
-        jsr     UTIL_PRINT_PASS_STATUS
-        jmp     TEST_PORT_JOYSTICK
+        sta     VIA1_PORT_A_NH                  ; User Port VIA Port A (No Handshake): Set Bit 7 High, rest Low
 
-ERR_TRAP_CASSETTE_FAIL_A:
-        jsr     UTIL_FLASH_ERROR_HANDLER
-        lda     #$CE
-        sta     VIA1_PER_CTRL
+        ; --- UI DISPLAY PHASE ---
+        ldx     #<STR_CASSETTE_PORT_PTR         ; Load low byte of the " CASSETTE PORT  " string address
+        ldy     #>STR_CASSETTE_PORT_PTR         ; Load high byte of the " CASSETTE PORT  " string address
+        inc     ZP_DIAG_CHECKPOINT_CTR          ; Advance diagnostic stage tracker for cartridge
+        jsr     UTIL_PRINT_STRING               ; Print test label to screen
+
+        ; --- PHASE 1: TEST CASSETTE SWITCH SENSE (MOTOR OFF) ---
+        lda     VIA2_INT_FLAGS
+        sta     VIA2_INT_FLAGS                  ; Clear VIA2 interrupt flags by writing 1s back to them
+        lda     VIA1_PORT_A_NH                  ; Read current status of VIA1 Port A
+        and     #$40                            ; Mask for Bit 6 (Cassette Switch Sense / Pin 6)
+        bne     ERR_TRAP_CASSETTE_FAIL_A        ; Catch Fault: If Bit 6 is High, Switch circuit is open/broken
+
+        ; --- PHASE 2: TEST MOTOR CONTROL TOGGLE ---
         lda     #$CC
-        sta     VIA1_PER_CTRL
-        jmp     ERR_TRAP_CASSETTE_FAIL_A
+        sta     VIA1_PER_CTRL                   ; User Port VIA PCR: Toggle CA2/CB2 Low (Turns Cassette Motor ON)
+        jsr     UTIL_HARDWARE_DELAY             ; Wait for voltage/relay to physically stabilize
+        lda     VIA1_PORT_A_NH                  ; Re-read VIA1 Port A status
+        and     #$40                            ; Mask for Bit 6 (Cassette Switch Sense)
+        beq     ERR_TRAP_CASSETTE_FAIL_A        ; Catch Fault: If Bit 6 stayed Low, Motor control line failed to switch
+
+        ; --- PHASE 3: WRITE-TO-READ LOOPBACK INTERRUPT TEST ---
+        lda     #$00
+        sta     VIA2_PORT_B                     ; Pull VIA2 Port B Low to pulse the Cassette Write line (Pin 5)
+        lda     VIA2_INT_FLAGS                  ; Read Keyboard VIA Interrupt Flag Register
+        and     #$02                            ; Mask for Bit 1 (CA1 Interrupt Flag / Cassette Read line)
+        beq     ERR_TRAP_CASSETTE_FAIL_B        ; Catch Fault: If 0, pulse failed to loop back into Cassette Read (Pin 4)
+
+        ; --- TEST PASSED ---
+        jsr     UTIL_PRINT_PASS_STATUS          ; Print "OK" or green status message
+        jmp     TEST_PORT_JOYSTICK              ; Exit test and advance to the Joystick module
+
+        ; --- TRAP ARCHITECTURE / ERROR HANDLING ---
+ERR_TRAP_CASSETTE_FAIL_A:
+        jsr     UTIL_FLASH_ERROR_HANDLER        ; Trigger visual error signal (flashes borders/VIC chip)
+        lda     #$CE
+        sta     VIA1_PER_CTRL                   ; Actively toggle Cassette Motor control line (CB2/CA2)
+        lda     #$CC
+        sta     VIA1_PER_CTRL                   ; Generates a square wave on the Motor line for oscilloscope tracing
+        jmp     ERR_TRAP_CASSETTE_FAIL_A        ; Permanent trap loop for Failure A (Switch Sense / Motor Logic Fault)
 
 ERR_TRAP_CASSETTE_FAIL_B:
-        jsr     UTIL_FLASH_ERROR_HANDLER
+        jsr     UTIL_FLASH_ERROR_HANDLER        ; Trigger visual error signal
         lda     #$00
-        sta     VIA2_PORT_B
+        sta     VIA2_PORT_B                     ; Actively pull Cassette Write line low
         lda     #$FF
-        sta     VIA2_PORT_B
-        jmp     ERR_TRAP_CASSETTE_FAIL_B
+        sta     VIA2_PORT_B                     ; Actively pull Cassette Write line high (cycles pulse for scope test)
+        jmp     ERR_TRAP_CASSETTE_FAIL_B        ; Permanent trap loop for Failure B (Write-to-Read Loopback Fault)
 
 TEST_PORT_JOYSTICK:
-        lda     #$94
-        sta     VIA1_DDR_A
+        ; --- PHASE 1 INITIALIZATION: SET BITS 7, 4, 2 TO OUTPUTS ---
+        lda     #$94                            ; Binary %10010100 (Bits 7, 4, and 2 as Outputs)
+        sta     VIA1_DDR_A                      ; Update VIA1 Data Direction Register A
         lda     #$FF
-        sta     VIA1_PORT_A_NH
-        ldx     #$F8
-        ldy     #$A4
-        inc     ZP_DIAG_CHECKPOINT_CTR
-        jsr     UTIL_PRINT_STRING
-        lda     VIA1_PORT_A_NH
-        tax
-        and     #$08
-        beq     ERR_TRAP_JOYSTICK_FAIL
-        txa
-        and     #$20
-        beq     ERR_TRAP_JOYSTICK_FAIL
-        lda     #$00
-        sta     VIA1_PORT_A_NH
-        lda     VIA1_PORT_A_NH
-        tax
-        and     #$08
-        bne     ERR_TRAP_JOYSTICK_FAIL
-        txa
-        and     #$20
-        bne     ERR_TRAP_JOYSTICK_FAIL
-        lda     #$14
-        sta     VIA1_DDR_A
-        lda     #$FF
-        sta     VIA1_PORT_A_NH
-        lda     VIA1_PORT_A_NH
-        tax
-        and     #$04
-        beq     ERR_TRAP_JOYSTICK_FAIL
-        txa
-        and     #$10
-        beq     ERR_TRAP_JOYSTICK_FAIL
-        lda     #$00
-        sta     VIA1_PORT_A_NH
-        lda     VIA1_PORT_A_NH
-        tax
-        and     #$04
-        bne     ERR_TRAP_JOYSTICK_FAIL
-        txa
-        and     #$10
-        bne     ERR_TRAP_JOYSTICK_FAIL
-        jsr     UTIL_PRINT_PASS_STATUS
-        jmp     TEST_PORT_USER_PORT
+        sta     VIA1_PORT_A_NH                  ; Set all output pins HIGH
 
-ERR_TRAP_JOYSTICK_FAIL:
-        jsr     UTIL_FLASH_ERROR_HANDLER
-        lda     #$FF
-        sta     VIA1_PORT_A_NH
+        ; --- UI DISPLAY PHASE ---
+        ldx     #<STR_JOYSTICK_PORT_PTR         ; Load low byte of " JOYSTICK PORT  " string address
+        ldy     #>STR_JOYSTICK_PORT_PTR         ; Load high byte of " JOYSTICK PORT  " string address
+        inc     ZP_DIAG_CHECKPOINT_CTR          ; Advance diagnostic stage tracker for cartridge
+        jsr     UTIL_PRINT_STRING               ; Print test label to screen
+
+        ; --- TEST 1A: STATIC HIGH TEST (BITS 3 & 5) ---
+        lda     VIA1_PORT_A_NH                  ; Read current status of VIA1 Port A input pins
+        tax                                     ; Preserve original read value in X register
+        and     #$08                            ; Mask Bit 3 (Joystick Switch / Loopback line)
+        beq     ERR_TRAP_JOYSTICK_FAIL          ; Catch Fault: If Bit 3 is Low, it's grounded/shorted
+        txa                                     ; Restore original read value to Accumulator
+        and     #$20                            ; Mask Bit 5 (Joystick Switch / Loopback line)
+        beq     ERR_TRAP_JOYSTICK_FAIL          ; Catch Fault: If Bit 5 is Low, it's grounded/shorted
+
+        ; --- TEST 1B: STATIC LOW TEST (BITS 3 & 5) ---
         lda     #$00
-        sta     VIA1_PORT_A_NH
-        jmp     ERR_TRAP_JOYSTICK_FAIL
+        sta     VIA1_PORT_A_NH                  ; Pull all driven output pins LOW
+        lda     VIA1_PORT_A_NH                  ; Re-read VIA1 Port A input pins
+        tax                                     ; Preserve read value in X register
+        and     #$08                            ; Mask Bit 3
+        bne     ERR_TRAP_JOYSTICK_FAIL          ; Catch Fault: If Bit 3 stayed High, it's stuck or broken
+        txa                                     ; Restore read value
+        and     #$20                            ; Mask Bit 5
+        bne     ERR_TRAP_JOYSTICK_FAIL          ; Catch Fault: If Bit 5 stayed High, it's stuck or broken
+
+        ; --- PHASE 2 INITIALIZATION: ALTERNATE CHANNELS (SET BITS 4 & 2 TO OUTPUTS) ---
+        lda     #$14                            ; Binary %00010100 (Bits 4 and 2 as Outputs, Bit 7 drops to Input)
+        sta     VIA1_DDR_A                      ; Reconfigure VIA1 Data Direction Register A
+        lda     #$FF
+        sta     VIA1_PORT_A_NH                  ; Pull driven output lines HIGH
+        
+        ; --- TEST 2A: STATIC HIGH TEST (BITS 2 & 4 AS CROSS-TALK INPUTS) ---
+        lda     VIA1_PORT_A_NH                  ; Re-read VIA1 Port A inputs
+        tax                                     ; Preserve read value in X register
+        and     #$04                            ; Mask Bit 2
+        beq     ERR_TRAP_JOYSTICK_FAIL          ; Catch Fault: If Bit 2 is Low, loopback pin dropped unexpectedly
+        txa                                     ; Restore read value
+        and     #$10                            ; Mask Bit 4
+        beq     ERR_TRAP_JOYSTICK_FAIL          ; Catch Fault: If Bit 4 is Low, loopback pin dropped unexpectedly
+
+        ; --- TEST 2B: STATIC LOW TEST (BITS 2 & 4 AS CROSS-TALK INPUTS) ---
+        lda     #$00
+        sta     VIA1_PORT_A_NH                  ; Pull driven lines LOW
+        lda     VIA1_PORT_A_NH                  ; Re-read VIA1 Port A inputs
+        tax                                     ; Preserve read value in X register
+        and     #$04                            ; Mask Bit 2
+        bne     ERR_TRAP_JOYSTICK_FAIL          ; Catch Fault: If Bit 2 stayed High, pin failed to cycle Low
+        txa                                     ; Restore read value
+        and     #$10                            ; Mask Bit 4
+        bne     ERR_TRAP_JOYSTICK_FAIL          ; Catch Fault: If Bit 4 stayed High, pin failed to cycle Low
+
+        ; --- TEST PASSED ---
+        jsr     UTIL_PRINT_PASS_STATUS          ; Print "OK" or green status message
+        jmp     TEST_PORT_USER_PORT             ; Exit test and advance to the User Port module
+
+        ; --- TRAP ARCHITECTURE / ERROR HANDLING ---
+ERR_TRAP_JOYSTICK_FAIL:
+        jsr     UTIL_FLASH_ERROR_HANDLER        ; Trigger visual error signal (flashes borders/VIC chip)
+        lda     #$FF
+        sta     VIA1_PORT_A_NH                  ; Rapidly cycle output lines HIGH...
+        lda     #$00
+        sta     VIA1_PORT_A_NH                  ; ...and LOW to output a trace signal for diagnostic hardware
+        jmp     ERR_TRAP_JOYSTICK_FAIL          ; Permanent trap loop for joystick input failures
 
 TEST_PORT_USER_PORT:
-        lda     #$AA
-        sta     VIA1_DDR_B
-        sta     VIA1_PORT_B
-        ldx     #$C5
-        ldy     #$A4
-        inc     ZP_DIAG_CHECKPOINT_CTR
-        jsr     UTIL_PRINT_STRING
-        lda     VIA1_PORT_B
-        cmp     #$FF
-        bne     LA6D2
-        lda     #$00
-        sta     VIA1_PORT_B
-        lda     VIA1_PORT_B
-        bne     LA6D2
-        lda     #$55
-        sta     VIA1_DDR_B
-        sta     VIA1_PORT_B
-        lda     VIA1_PORT_B
-        cmp     #$FF
-        bne     LA6D2
-        lda     #$00
-        sta     VIA1_PORT_B
-        lda     VIA1_PORT_B
-        bne     LA6D2
-        jsr     UTIL_PRINT_PASS_STATUS
-        rts
+        ; --- PHASE 1: INITIALISE ALTERNATING BIT REVERSE PATTERN ---
+        lda     #$AA                            ; Binary %10101010 (Even bits = Outputs, Odd bits = Inputs)
+        sta     VIA1_DDR_B                      ; Configure User Port Data Direction Register B
+        sta     VIA1_PORT_B                     ; Drive the active Output pins High
 
-LA6D2:  jsr     UTIL_FLASH_ERROR_HANDLER
-        lda     #$FF
-        sta     VIA1_PORT_B
+        ; --- UI DISPLAY PHASE ---
+        ldx     #<STR_USER_PORT_PTR             ; Load low byte of " USER PORT      " string pointer
+        ldy     #>STR_USER_PORT_PTR             ; Load high byte of " USER PORT      " string pointer
+        inc     ZP_DIAG_CHECKPOINT_CTR          ; Advance diagnostic stage tracking state
+        jsr     UTIL_PRINT_STRING               ; Print test label to screen
+
+        ; --- TEST 1A: CHECK PINS FLOATING OR LINKED HIGH ---
+        lda     VIA1_PORT_B                     ; Read back the Port B lines
+        cmp     #$FF                            ; Expected $FF (%11111111) due to loopback wiring
+        bne     ERR_TRAP_USER_PORT_FAIL         ; Catch Fault: Jump to error loop if any bit is missing
+        
+        ; --- TEST 1B: CHECK DRIVEN LOW STATES ---
         lda     #$00
-        sta     VIA1_PORT_B
-        jmp     LA6D2
+        sta     VIA1_PORT_B                     ; Drive active output pins Low
+        lda     VIA1_PORT_B                     ; Read back Port B lines again
+        bne     ERR_TRAP_USER_PORT_FAIL         ; Catch Fault: If result is not zero, a pin is stuck High
+
+        ; --- PHASE 2: INVERT BIT PATTERN (CHECKERBOARD FLIP) ---
+        lda     #$55                            ; Binary %01010101 (Even bits = Inputs, Odd bits = Outputs)
+        sta     VIA1_DDR_B                      ; Swap all pin directions on User Port B
+        sta     VIA1_PORT_B                     ; Drive newly assigned Output pins High
+        
+        ; --- TEST 2A: CHECK INVERTED HIGH STATES ---
+        lda     VIA1_PORT_B                     ; Read back the shifted configuration
+        cmp     #$FF                            ; Expected $FF due to loopback crossing
+        bne     ERR_TRAP_USER_PORT_FAIL         ; Catch Fault: Jump to error loop if any bit failed to cross
+        
+        ; --- TEST 2B: CHECK INVERTED LOW STATES ---
+        lda     #$00
+        sta     VIA1_PORT_B                     ; Drive inverted output pins Low
+        lda     VIA1_PORT_B                     ; Final read verification of the lines
+        bne     ERR_TRAP_USER_PORT_FAIL         ; Catch Fault: Non-zero means a line is shorted/stuck
+
+        ; --- TEST PASSED ---
+        jsr     UTIL_PRINT_PASS_STATUS          ; Execution clean. Print "OK" or green pass indicator
+        rts                                     ; Return from Subroutine (ends this specific suite of tests)
+
+        ; --- TRAP ARCHITECTURE / ERROR HANDLING ---
+ERR_TRAP_USER_PORT_FAIL:
+        jsr     UTIL_FLASH_ERROR_HANDLER        ; Call global warning routine to flash screen/border
+        lda     #$FF
+        sta     VIA1_PORT_B                     ; Drive lines High...
+        lda     #$00
+        sta     VIA1_PORT_B                     ; ...then Low to generate a clear square wave on faulty bits
+        jmp     ERR_TRAP_USER_PORT_FAIL         ; Permanent trap loop for User Port hardware failure
 
 TEST_PHASE_VIA_EDGE_CHECKS:
+        ; --- PHASE 1 INITIALIZATION: POINTER TO VIA1 REGISTERS ---
         lda     #$10
-        sta     ZP_VIC_REG_PTR_LO
+        sta     ZP_VIC_REG_PTR_LO               ; Low Byte of pointer = $10
         lda     #$91
-        sta     ZP_VIC_REG_PTR_HI
+        sta     ZP_VIC_REG_PTR_HI               ; High Byte of pointer = $91 (Base Address of VIA1: $9110)
         lda     #$80
-        sta     VIA1_DDR_A
-        ldy     #$08
-        lda     #$00
-        ldx     $1C
-        beq     LA6FB
-        lda     #$02
-        ldy     #$06
-LA6FB:  sta     ZP_STRING_SELECT_IDX
-        sty     ZP_LOOP_LIMIT_CTR
-LA6FF:  lda     ZP_STRING_SELECT_IDX
-        asl     a
-        tax
-        ldy     LA749+1,x
-        lda     LA749,x
-        tax
-        jsr     UTIL_PRINT_STRING
-        jsr     UTIL_REFRESH_VIC_COLOR_BARS
-        jsr     UTIL_VALIDATE_HARDWARE_TIMING
-        inc     ZP_STRING_SELECT_IDX
-        dec     ZP_LOOP_LIMIT_CTR
-        bne     LA6FF
+        sta     VIA1_DDR_A                      ; Set User Port VIA Port A Bit 7 as Output, Bits 0-6 as Inputs
+        
+        ; --- STEP 2: MODE SELECTION VIA VALUE AT ADDR $1C ---
+        ldy     #$08                            ; Default Loop Limit Counter = 8 test passes
+        lda     #$00                            ; Default Start Index = 0 (Points to "POS EDGE CA1:")
+        ldx     $1C                             ; Read Hardware/Mode flag configuration byte at $001C
+        beq     LA6FB                           ; If value at $1C is 0, keep defaults and execute full test suite
+        lda     #$02                            ; Alternate Mode: Advance Start Index to 2 (Points to "POS EDGE CB1:")
+        ldy     #$06                            ; Alternate Mode: Reduce Loop Limit Counter to 6 test passes
+LA6FB:  sta     ZP_STRING_SELECT_IDX            ; Store calculated starting text index
+        sty     ZP_LOOP_LIMIT_CTR               ; Store loop pass limit counter
+
+        ; --- LOOP 1: PROCESS NON-INTERRUPT CHANNELS (POLLED TIMING) ---
+LA6FF:  lda     ZP_STRING_SELECT_IDX            ; Fetch current test ID index
+        asl     a                               ; Multiply index by 2 (Left shift) to convert into 16-bit address offset
+        tax                                     ; Transfer pointer offset index to X register
+        ldy     LA749+1,x                       ; Fetch High Byte of string memory address from vector table
+        lda     LA749,x                         ; Fetch Low Byte of string memory address from vector table
+        tax                                     ; Move Low Byte to X (UTIL_PRINT_STRING expects address in X/Y or Y/A)
+        jsr     UTIL_PRINT_STRING               ; Display current edge/timer test label on the monitor screen
+        jsr     UTIL_REFRESH_VIC_COLOR_BARS     ; Force a render cycle refresh to prevent display screen flickering
+        jsr     UTIL_VALIDATE_HARDWARE_TIMING   ; Execute the actual real-time edge/timer verification hardware loop
+        inc     ZP_STRING_SELECT_IDX            ; Move pointer index to next test string entry
+        dec     ZP_LOOP_LIMIT_CTR               ; Decrement remaining loop pass counter
+        bne     LA6FF                           ; Branch back if more tests remain in the polled phase
+
+        ; --- PHASE 3: CONFIGURE POINTER FOR VIA2 REGISTERS (INTERRUPT DRIVEN) ---
         lda     #$20
-        sta     ZP_VIC_REG_PTR_LO
+        sta     ZP_VIC_REG_PTR_LO               ; Low Byte of pointer = $20
         lda     #$91
-        sta     ZP_VIC_REG_PTR_HI
+        sta     ZP_VIC_REG_PTR_HI               ; High Byte of pointer = $91 (Base Address of VIA2: $9120)
         lda     #$02
-        sta     ZP_LOOP_LIMIT_CTR
-        jsr     UTIL_RESET_VIA_PERIPHERALS
-LA728:  lda     ZP_STRING_SELECT_IDX
-        asl     a
-        tax
-        lda     LA749,x
-        ldy     LA749+1,x
-        tax
-        jsr     UTIL_PRINT_STRING
-        jsr     UTIL_REFRESH_VIC_COLOR_BARS
-        cli
-        jsr     UTIL_VALIDATE_HARDWARE_TIMING
-        inc     ZP_STRING_SELECT_IDX
-        dec     ZP_LOOP_LIMIT_CTR
-        bne     LA728
-        jsr     UTIL_RESET_VIA_PERIPHERALS
-        jmp     INIT_HOOK_SYSTEM_IRQ
+        sta     ZP_LOOP_LIMIT_CTR               ; Set final execution sequence counter to run 2 final tests
+        jsr     UTIL_RESET_VIA_PERIPHERALS      ; Initialise/Clear peripheral control states on VIA chips
 
-LA749:  .addr   LA75D
-        .addr   LA76E
-        .addr   LA77F
-        .addr   LA790
-        .addr   LA7A1
-        .addr   LA7B2
-        .addr   LA7C3
-        .addr   LA7D4
-        .addr   LA7E5
-        .addr   LA7F6
+        ; --- LOOP 2: PROCESS INTERRUPT CHANNELS (TIMER DEV2 REVISIONS) ---
+LA728:  lda     ZP_STRING_SELECT_IDX            ; Fetch remaining test ID index (Starts at Index 8 after Loop 1)
+        asl     a                               ; Multiply index by 2 for word-aligned table lookup
+        tax                                     ; Move offset to X register
+        lda     LA749,x                         ; Extract Low Byte of string memory address
+        ldy     LA749+1,x                       ; Extract High Byte of string memory address
+        tax                                     ; Format address argument for print routine
+        jsr     UTIL_PRINT_STRING               ; Display the text block (e.g., " TIMER 1 DEV2:  ")
+        jsr     UTIL_REFRESH_VIC_COLOR_BARS     ; Keep system video registers synced during test execution
+        cli                                     ; Clear Interrupt Disable Flag (ALLOW 6502 hardware IRQs to trigger)
+        jsr     UTIL_VALIDATE_HARDWARE_TIMING   ; Test the countdown/interrupt precision of the VIA internal timers
+        inc     ZP_STRING_SELECT_IDX            ; Increment string index tracker
+        dec     ZP_LOOP_LIMIT_CTR               ; Decrement loop safety iteration counter
+        bne     LA728                           ; Keep going until the remaining 2 timer tests pass or fail
+        
+        jsr     UTIL_RESET_VIA_PERIPHERALS      ; Safe reset of hardware peripheral states to pristine values
+        jmp     INIT_HOOK_SYSTEM_IRQ            ; Exit diagnostics, wire custom IRQ handler vector, and pass control
+
+; --- STRING VECTOR LOOKUP TABLE (16-BIT ADDRESSES) ---
+LA749:  .addr   LA75D                           ; Index 0: POS EDGE CA1
+        .addr   LA76E                           ; Index 1: NEG EDGE CA1
+        .addr   LA77F                           ; Index 2: POS EDGE CB1
+        .addr   LA790                           ; Index 3: NEG EDGE CB1
+        .addr   LA7A1                           ; Index 4: POS EDGE CB2
+        .addr   LA7B2                           ; Index 5: NEG EDGE CB2
+        .addr   LA7C3                           ; Index 6: TIMER 1 DEV1
+        .addr   LA7D4                           ; Index 7: TIMER 2 DEV1
+        .addr   LA7E5                           ; Index 8: TIMER 1 DEV2
+        .addr   LA7F6                           ; Index 9: TIMER 2 DEV2
+
+; --- PLAIN TEXT DISPLAY DATA TERMINATED BY REVERSE-VIDEO NULL MARKERS ---
 LA75D:  .byte   " POS EDGE CA1:  "
-
         .byte   $00
 LA76E:  .byte   " NEG EDGE CA1:  "
-
         .byte   $00
 LA77F:  .byte   " POS EDGE CB1:  "
-
         .byte   $00
 LA790:  .byte   " NEG EDGE CB1:  "
-
         .byte   $00
 LA7A1:  .byte   " POS EDGE CB2:  "
-
         .byte   $00
 LA7B2:  .byte   " NEG EDGE CB2:  "
-
         .byte   $00
 LA7C3:  .byte   " TIMER 1 DEV1:  "
-
         .byte   $00
 LA7D4:  .byte   " TIMER 2 DEV1:  "
-
         .byte   $00
 LA7E5:  .byte   " TIMER 1 DEV2:  "
-
         .byte   $00
 LA7F6:  .byte   " TIMER 2 DEV2:  "
-
         .byte   $00
+
 TEST_PHASE_VIC_SOUND:
         ldx     #$16
         ldy     #$A9
@@ -1209,44 +1273,63 @@ LA9DA:  sta     VIA2_PORT_B,x
         rts
 
 INIT_HOOK_SYSTEM_IRQ:
-        sei
-        lda     #$07
-        sta     RAM_IRQ_VECTOR_LO
-        lda     #$AA
-        sta     RAM_IRQ_VECTOR_HI
-        lda     #$40
-        sta     VIA2_AUX_CTRL
-        lda     #$C0
-        sta     VIA2_INT_ENABLE
+        ; --- RESTORE RUNTIME IRQ VECTOR ---
+        sei                             ; Disable interrupts while rewriting the system vector
+        lda     #<IRQ_HANDLER           ; Load low byte of the runtime system IRQ handler
+        sta     RAM_IRQ_VECTOR_LO       ; Direct KERNAL vector to the new handler ($0314)
+        lda     #>IRQ_HANDLER           ; Load high byte of the runtime system IRQ handler
+        sta     RAM_IRQ_VECTOR_HI       ; Direct KERNAL vector to the new handler ($0315)
+
+        ; --- CONFIGURE VIA2 TIMER 1 FOR CONTINUOUS INTERRUPTS ---
+        lda     #$40                    ; Binary %01000000: Set Timer 1 to continuous interrupts (Bit 6)
+        sta     VIA2_AUX_CTRL           ; Update VIA2 Auxiliary Control Register ($912B)
+        lda     #$C0                    ; Binary %11000000: Enable Timer 1 Interrupt (Set Bit 7 Enable + Bit 6 T1)
+        sta     VIA2_INT_ENABLE         ; Update VIA2 Interrupt Enable Register ($912E)
+
+        ; --- START HEARTBEAT CLOCK COUNTDOWN ---
+        ; Sets a latched 16-bit countdown value of $4289 (17,033 clock cycles)
+        ; At 1.02 MHz (PAL) / 1.01 MHz (NTSC), this generates an IRQ roughly every 1/60th of a second.
         lda     #$89
-        sta     VIA2_T1_CTR_LO
+        sta     VIA2_T1_CTR_LO          ; Write low byte of latch/counter ($9124)
         lda     #$42
-        sta     VIA2_T1_CTR_HI
-        cli
-        rts
+        sta     VIA2_T1_CTR_HI          ; Write high byte of counter ($9125) and active-start the timer
+
+        cli                             ; Safely re-enable interrupts to start the heartbeat clock
+        rts                             ; Return from setup block
 
 IRQ_HANDLER:
-        lda     $9C00
-        and     #$01
-        bne     IRQ_HANDLER
-        dec     $0410
-        bpl     LAA23
+        ; --- MASTER SYSTEM RASTER / SIGNAL POLLING LOOP ---
+        lda     $9C00                   ; Check an I/O or state tracking register address
+        and     #$01                    ; Isolate bit 0
+        bne     IRQ_HANDLER             ; Spin-wait here if bit 0 is high (awaits custom sync condition)
+
+        ; --- VISUAL FLASH TIMER / PULSE ACCUMULATOR ---
+        dec     $0410                   ; Decrement the flash/tick timer variable at $0410
+        bpl     LAA23                   ; If the counter is still positive (>= 0), branch past flash toggle
+
+        ; --- TOGGLE BACKGROUND/BORDER FLIPPERS ---
         lda     #$08
-        sta     $0410
-        lda     #$C0
-        eor     $0411
-        sta     $9800
-        sta     $0411
-LAA23:  jsr     INIT_STEP_BCD_CLOCK
-        jsr     INIT_REFRESH_CLOCK_BANNER
-        lda     VIA2_INT_FLAGS
-        sta     VIA2_INT_FLAGS
-        pla
-        tay
-        pla
-        tax
-        pla
-        rti
+        sta     $0410                   ; Reset flash tick counter back to 8 frames
+        lda     #$C0                    ; Load bitmask value
+        eor     $0411                   ; XOR with current state tracking register at $0411 to flip bits
+        sta     $9800                   ; Write updated value directly to video/system memory location $9800
+        sta     $0411                   ; Store updated tracking bit back into $0411
+
+        ; --- TICK TIME ENGINE ---
+LAA23:  jsr     INIT_STEP_BCD_CLOCK     ; Advance real-time clock array bytes using 6502 decimal mode (`sed`)
+        jsr     INIT_REFRESH_CLOCK_BANNER ; Redraw the flashing clock text data dynamically onto the VIC screen
+        
+        ; --- ACKNOWLEDGE HARDWARE TIMERS ---
+        lda     VIA2_INT_FLAGS          ; Read the current VIA2 Interrupt Flags
+        sta     VIA2_INT_FLAGS          ; Write 1s back to clear Timer 1 interrupt latch, resetting the hardware pin
+        
+        ; --- CLEAN STACK RESTORATION ---
+        pla                             ; Pull saved Y register value from the Stack
+        tay                             ; Restore original Index Register Y
+        pla                             ; Pull saved X register value from the Stack
+        tax                             ; Restore original Index Register X
+        pla                             ; Pull saved Accumulator value from the Stack
+        rti                             ; Return From Interrupt (Restores Processor Flags and Program Counter)
 
 INIT_STEP_BCD_CLOCK:
         sed
@@ -1393,43 +1476,60 @@ LAB3F:  ldx     ZP_TEMP_STRING_LEN
         rts
 
 VIA_EDGE_NMI_HANDLER:
-        pha
-        tax
-        pha
-        tya
-        pha
+        ; --- NMI REGISTER PRESERVATION PHASE ---
+        pha                                     ; Push Accumulator (A) onto the Stack
+        txa                                     ; Transfer Index Register X to Accumulator
+        pha                                     ; Push original X onto the Stack
+        tya                                     ; Transfer Index Register Y to Accumulator
+        pha                                     ; Push original Y onto the Stack
+        ; Note: Execution falls directly into the IRQ handler to reuse the verification logic.
+
 VIA_EDGE_IRQ_HANDLER:
-        lda     ZP_SAVED_REG_E
-        beq     ERR_HANDLER_CATASTROPHIC_IRQ
-        sta     ZP_SAVED_REG_F
-        ldy     ZP_STRING_SELECT_IDX
-        lda     VIC_TABLE_AUDIO_VOICES,y
-        and     #$7F
-        ldy     #$0D
-        and     (ZP_VIC_REG_PTR_LO),y
-        beq     ERR_HANDLER_CATASTROPHIC_IRQ
-        lda     (ZP_VIC_REG_PTR_LO),y
-        sta     (ZP_VIC_REG_PTR_LO),y
-        lda     #$7F
-        ldy     #$0E
-        sta     (ZP_VIC_REG_PTR_LO),y
-        pla
-        tay
-        sty     ZP_SAVED_REG_D
-        pla
-        tax
-        pla
-        sta     ZP_SAVED_REG_C
-        rti
+        ; --- INTERRUPT VALIDATION PHASE ---
+        lda     ZP_SAVED_REG_E                  ; Check expected interrupt flag condition variable
+        beq     ERR_HANDLER_CATASTROPHIC_IRQ    ; If 0, an interrupt fired when it shouldn't have (Catastrophic Fault)
+        sta     ZP_SAVED_REG_F                  ; Log/mirror the triggered interrupt status byte into storage
+        
+        ; --- HARDWARE FLAG VERIFICATION ---
+        ldy     ZP_STRING_SELECT_IDX            ; Fetch the active test index (0-9 from the prior edge test block)
+        lda     VIC_TABLE_AUDIO_VOICES,y        ; Look up the expected bitmask for this specific edge/timer test
+        and     #$7F                            ; Mask out the highest bit to isolate the targeted interrupt bit
+        ldy     #$0D                            ; Offset $0D on a 6522 VIA is the Interrupt Flag Register (IFR)
+        and     (ZP_VIC_REG_PTR_LO),y           ; Read VIA IFR (via the pointer set in prior phase) and mask with expected bit
+        beq     ERR_HANDLER_CATASTROPHIC_IRQ    ; If masked bit is 0, the expected hardware flag never actually tripped!
+
+        ; --- ACKNOWLEDGE / CLEAR HARDWARE INTERRUPTS ---
+        lda     (ZP_VIC_REG_PTR_LO),y           ; Re-read the VIA Interrupt Flag Register state
+        sta     (ZP_VIC_REG_PTR_LO),y           ; Write the value back to the IFR (6522 mechanism: writing a 1 clears that flag)
+        lda     #$7F                            ; Load bitmask to clear interrupt enable states
+        ldy     #$0E                            ; Offset $0E on a 6522 VIA is the Interrupt Enable Register (IER)
+        sta     (ZP_VIC_REG_PTR_LO),y           ; Write to IER to safely disable further interrupts from this source
+
+        ; --- STACK RESTORATION & RETURN ---
+        pla                                     ; Pull saved Y register value from the Stack
+        tay                                     ; Restore original Index Register Y
+        sty     ZP_SAVED_REG_D                  ; Back up Y to a temporary zero-page tracking variable for debugging
+        pla                                     ; Pull saved X register value from the Stack
+        tax                                     ; Restore original Index Register X
+        pla                                     ; Pull saved Accumulator value from the Stack
+        sta     ZP_SAVED_REG_C                  ; Back up A to a temporary zero-page tracking variable
+        rti                                     ; Return From Interrupt (Restores Processor Flags and Program Counter)
 
 ERR_HANDLER_CATASTROPHIC_IRQ:
-        lda     (ZP_VIC_REG_PTR_LO),y
-        sta     (ZP_VIC_REG_PTR_LO),y
-        ldx     #$92
-        ldy     #$AB
-        jsr     UTIL_PRINT_STRING
-LAB7F:  jsr     UTIL_FLASH_ERROR_HANDLER
-        jmp     LAB7F
+        ; --- CLEAN UP THE OFFENDING HARDWARE FLAG ---
+        ; Y register contains $0D (offset for the 6522 VIA Interrupt Flag Register)
+        ; transferred directly from the active verification check inside the handler.
+        lda     (ZP_VIC_REG_PTR_LO),y           ; Read the current contents of the VIA Interrupt Flag Register (IFR)
+        sta     (ZP_VIC_REG_PTR_LO),y           ; Write the value back to the IFR to clear the latching bits (Write-1-to-Clear)
+
+        ; --- UI ERROR PRINT PHASE ---
+        ldx     #<STR_WRONG_INTERRUPT_PTR       ; Load low byte of the catastrophic error string address
+        ldy     #>STR_WRONG_INTERRUPT_PTR       ; Load high byte of the catastrophic error string address
+        jsr     UTIL_PRINT_STRING               ; Display the diagnostic error message/code on the monitor
+
+        ; --- TRAP ARCHITECTURE LOCKUP ---
+LAB7F:  jsr     UTIL_FLASH_ERROR_HANDLER        ; Call the global video register routine to flash the screen border
+        jmp     LAB7F                           ; Permanent infinite loop to completely stop execution
 
 UTIL_HEX_CONVERT_AND_CLEAN:
         jsr     UTIL_HEX_TO_ASCII
