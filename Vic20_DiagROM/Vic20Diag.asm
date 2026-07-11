@@ -1,120 +1,158 @@
-; da65 V2.19 - Git cc3c40c
-; Created:    2026-07-11 02:58:46
-; Input file: vc-20-diag.324173-01_blk5.bin
-; Page:       1
+.setcpu "6502"
+.feature string_escapes
 
-        .setcpu "6502"
+; Map standard ASCII alphanumeric characters directly to PETSCII
+.charmap $30, $30 ; 0
+.charmap $31, $31 ; 1
+.charmap $32, $32 ; 2
+.charmap $33, $33 ; 3
+.charmap $34, $34 ; 4
+.charmap $35, $35 ; 5
+.charmap $36, $36 ; 6
+.charmap $37, $37 ; 7
+.charmap $38, $38 ; 8
+.charmap $39, $39 ; 9
+.charmap $20, $20 ; Space
 
-ZP_PTR_INDIRECT_A_LO:= $0002
-ZP_PTR_INDIRECT_A_HI:= $0003
-ZP_PTR_INDIRECT_B_LO:= $0006
-ZP_PTR_INDIRECT_B_HI:= $0007
-ZP_TEMP_CHAR_DATA:= $0008
-ZP_TEMP_STRING_LEN:= $0009
-ZP_SCREEN_SCROLL_FLG  := $000B
-ZP_TIME_ELAPSED_LO    := $000C
-ZP_TIME_ELAPSED_HI    := $000D
-ZP_INT_EXPECTED_FLG   := $000E
-ZP_INT_TRIGGERED_FLG  := $000F
-ZP_SCREEN_BUF_POS:= $0010
-ZP_STRING_TEMP_LO:= $0013
-ZP_STRING_TEMP_HI:= $0014
-ZP_PORT_LINE_OFFSET:= $0015
-ZP_STRING_SELECT_IDX:= $0016
-ZP_MATRIX_SCAN_CTR:= $0017
-ZP_DIAG_CHECKPOINT_CTR:= $0018
-ZP_LOOP_LIMIT_CTR:= $0019
-ZP_VIC_REG_PTR_LO:= $001A
-ZP_VIC_REG_PTR_HI:= $001B
-ZP_DIAG_SYSTEM_FLG:= $001D
-ZP_PTR_COLOR_RAM_LO:= $001E
-ZP_PTR_COLOR_RAM_HI:= $001F
-ZP_PTR_SCREEN_RAM_LO:= $0020
-ZP_PTR_SCREEN_RAM_HI:= $0021
-ZP_AUDIO_FREQ_LO:= $0022
-ZP_AUDIO_FREQ_HI:= $0023
-ZP_LOOP_PASS_CTR:= $0025
-RAM_IRQ_VECTOR_LO:= $0314
-RAM_IRQ_VECTOR_HI:= $0315
-RAM_NMI_VECTOR_LO:= $0318
-RAM_NMI_VECTOR_HI:= $0319
-RAM_CYCLE_CLOCK_BUFFER:= $0407
-REG_AUDIO_STATUS_FLG:= $041A
-REG_LOOP_IDX    := $041B
-VIDEO_RAM_PAGE_1:= $1E00
-VIDEO_RAM_PAGE_2:= $1F00
-VIC_REG_SCREEN_X:= $9000
-VIC_REG_SCREEN_Y:= $9001
-VIC_REG_COLS_NUM:= $9002
-VIC_REG_ROWS_NUM:= $9003
-VIC_REG_RASTER_LINE:= $9004
-VIC_REG_CHAR_MAP_PTR:= $9005
-VIC_REG_LIGHT_PEN_X:= $9006
-VIC_REG_LIGHT_PEN_Y:= $9007
-VIC_REG_AUDIO_BASS:= $900A
-VIC_REG_AUDIO_ALTO:= $900B
-VIC_REG_AUDIO_TENOR:= $900C
-VIC_REG_AUDIO_NOISE:= $900D
-VIC_REG_AUDIO_VOL:= $900E
-VIC_REG_BG_BORDER_CLR:= $900F
-VIA1_PORT_B     := $9110
-VIA1_PORT_A     := $9111
-VIA1_DDR_B      := $9112
-VIA1_DDR_A      := $9113
-VIA1_T1_CTR_LO  := $9114
-VIA1_T1_CTR_HI  := $9115
-VIA1_T1_LAT_LO  := $9116
-VIA1_T1_LAT_HI  := $9117
-VIA1_T2_CTR_LO  := $9118
-VIA1_T2_CTR_HI  := $9119
-VIA1_SHIFT_REG  := $911A
-VIA1_AUX_CTRL   := $911B
-VIA1_PER_CTRL   := $911C
-VIA1_INT_FLAGS  := $911D
-VIA1_INT_ENABLE := $911E
-VIA1_PORT_A_NH  := $911F
-VIA2_PORT_B     := $9120
-VIA2_PORT_A     := $9121
-VIA2_DDR_B      := $9122
-VIA2_DDR_A      := $9123
-VIA2_T1_CTR_LO  := $9124
-VIA2_T1_CTR_HI  := $9125
-VIA2_T1_LAT_LO  := $9126
-VIA2_T1_LAT_HI  := $9127
-VIA2_T2_CTR_LO  := $9128
-VIA2_T2_CTR_HI  := $9129
-VIA2_SHIFT_REG  := $912A
-VIA2_AUX_CTRL   := $912B
-VIA2_PER_CTRL   := $912C
-VIA2_INT_FLAGS  := $912D
-VIA2_INT_ENABLE := $912E
-VIA2_PORT_A_NH  := $912F
-COLOR_RAM_PAGE_1:= $9600
-COLOR_RAM_PAGE_2:= $9700
-LF2AE           := $F2AE
+.charmap $41, $41 ; A
+.charmap $42, $42 ; B
+.charmap $43, $43 ; C
+.charmap $44, $44 ; D
+.charmap $45, $45 ; E
+.charmap $46, $46 ; F
+.charmap $47, $47 ; G
+.charmap $48, $48 ; H
+.charmap $49, $49 ; I
+.charmap $4A, $4A ; J
+.charmap $4B, $4B ; K
+.charmap $4C, $4C ; L
+.charmap $4D, $4D ; M
+.charmap $4E, $4E ; N
+.charmap $4F, $4F ; O
+.charmap $50, $50 ; P
+.charmap $51, $51 ; Q
+.charmap $52, $52 ; R
+.charmap $53, $53 ; S
+.charmap $54, $54 ; T
+.charmap $55, $55 ; U
+.charmap $56, $56 ; V
+.charmap $57, $57 ; W
+.charmap $58, $58 ; X
+.charmap $59, $59 ; Y
+.charmap $5A, $5A ; Z
 
-        .addr   BOOT_HARDWARE_INIT
-        .addr   BOOT_HARDWARE_INIT
+ZP_PTR_INDIRECT_A_LO    := $0002
+ZP_PTR_INDIRECT_A_HI    := $0003
+ZP_PTR_INDIRECT_B_LO    := $0006
+ZP_PTR_INDIRECT_B_HI    := $0007
+ZP_TEMP_CHAR_DATA       := $0008
+ZP_TEMP_STRING_LEN      := $0009
+ZP_SCREEN_SCROLL_FLG    := $000B
+ZP_TIME_ELAPSED_LO      := $000C
+ZP_TIME_ELAPSED_HI      := $000D
+ZP_INT_EXPECTED_FLG     := $000E
+ZP_INT_TRIGGERED_FLG    := $000F
+ZP_SCREEN_BUF_POS       := $0010
+ZP_STRING_TEMP_LO       := $0013
+ZP_STRING_TEMP_HI       := $0014
+ZP_PORT_LINE_OFFSET     := $0015
+ZP_STRING_SELECT_IDX    := $0016
+ZP_MATRIX_SCAN_CTR      := $0017
+ZP_DIAG_CHECKPOINT_CTR  := $0018
+ZP_LOOP_LIMIT_CTR       := $0019
+ZP_VIC_REG_PTR_LO       := $001A
+ZP_VIC_REG_PTR_HI       := $001B
+ZP_DIAG_SYSTEM_FLG      := $001D
+ZP_PTR_COLOR_RAM_LO     := $001E
+ZP_PTR_COLOR_RAM_HI     := $001F
+ZP_PTR_SCREEN_RAM_LO    := $0020
+ZP_PTR_SCREEN_RAM_HI    := $0021
+ZP_AUDIO_FREQ_LO        := $0022
+ZP_AUDIO_FREQ_HI        := $0023
+ZP_LOOP_PASS_CTR        := $0025
+RAM_IRQ_VECTOR_LO       := $0314
+RAM_IRQ_VECTOR_HI       := $0315
+RAM_NMI_VECTOR_LO       := $0318
+RAM_NMI_VECTOR_HI       := $0319
+RAM_CYCLE_CLOCK_BUFFER  := $0407
+REG_AUDIO_STATUS_FLG    := $041A
+REG_LOOP_IDX            := $041B
+VIDEO_RAM_PAGE_1        := $1E00
+VIDEO_RAM_PAGE_2        := $1F00
+VIC_REG_SCREEN_X        := $9000
+VIC_REG_SCREEN_Y        := $9001
+VIC_REG_COLS_NUM        := $9002
+VIC_REG_ROWS_NUM        := $9003
+VIC_REG_RASTER_LINE     := $9004
+VIC_REG_CHAR_MAP_PTR    := $9005
+VIC_REG_LIGHT_PEN_X     := $9006
+VIC_REG_LIGHT_PEN_Y     := $9007
+VIC_REG_AUDIO_BASS      := $900A
+VIC_REG_AUDIO_ALTO      := $900B
+VIC_REG_AUDIO_TENOR     := $900C
+VIC_REG_AUDIO_NOISE     := $900D
+VIC_REG_AUDIO_VOL       := $900E
+VIC_REG_BG_BORDER_CLR   := $900F
+VIA1_PORT_B             := $9110
+VIA1_PORT_A             := $9111
+VIA1_DDR_B              := $9112
+VIA1_DDR_A              := $9113
+VIA1_T1_CTR_LO          := $9114
+VIA1_T1_CTR_HI          := $9115
+VIA1_T1_LAT_LO          := $9116
+VIA1_T1_LAT_HI          := $9117
+VIA1_T2_CTR_LO          := $9118
+VIA1_T2_CTR_HI          := $9119
+VIA1_SHIFT_REG          := $911A
+VIA1_AUX_CTRL           := $911B
+VIA1_PER_CTRL           := $911C
+VIA1_INT_FLAGS          := $911D
+VIA1_INT_ENABLE         := $911E
+VIA1_PORT_A_NH          := $911F
+VIA2_PORT_B             := $9120
+VIA2_PORT_A             := $9121
+VIA2_DDR_B              := $9122
+VIA2_DDR_A              := $9123
+VIA2_T1_CTR_LO          := $9124
+VIA2_T1_CTR_HI          := $9125
+VIA2_T1_LAT_LO          := $9126
+VIA2_T1_LAT_HI          := $9127
+VIA2_T2_CTR_LO          := $9128
+VIA2_T2_CTR_HI          := $9129
+VIA2_SHIFT_REG          := $912A
+VIA2_AUX_CTRL           := $912B
+VIA2_PER_CTRL           := $912C
+VIA2_INT_FLAGS          := $912D
+VIA2_INT_ENABLE         := $912E
+VIA2_PORT_A_NH          := $912F
+COLOR_RAM_PAGE_1        := $9600
+COLOR_RAM_PAGE_2        := $9700
+LF2AE                   := $F2AE
 
-        .byte   $41,$30,$C3,$C2
+.segment "HEADER"
+.word   BOOT_HARDWARE_INIT
+.word   BOOT_HARDWARE_INIT
+.byte   $41, $30        	; "A0"
+.byte   $C3, $C2, $CD   	; "CBM" (with high bits set)
+
+.segment "CODE"
 
 VIC_INIT_REG_MATRIX:
-        .byte   $CD,$0C,$19,$96,$2E,$00,$F0,$00
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $1B
+        .byte   $0C,$19,$96,$2E,$00,$F0,$00,$00
+        .byte   $00,$00,$00,$00,$00,$00,$00,$1B
 
 BOOT_HARDWARE_INIT:
-        ; --- PHASE 1: CPU STATE CALIBRATION ---
         sei                                     ; Set Interrupt Disable flag (blocks all maskable hardware IRQs)
         ldx     #$FF                            ; Load absolute maximum 8-bit index value ($FF)
         txs                                     ; Transfer X to Stack Pointer (forces stack boundary origin to $01FF)
         cld                                     ; Clear Decimal Mode flag (restores safe baseline hex/binary CPU math)
 
-        ; --- PHASE 2: VIC VIDEO REGISTER INITIALIZATION SUITE ---
-        ; Loops backward through 17 registers (16 down to 0) to prime the VIC video chip.
+        ; --- BUG --- This writes an extra byte to the top of character ROM.
+        ; --- BUG --- It should be bne not bpl !!!
+
         ldx     #$10                            ; Set index loop counter to 16 ($10)
-LA020:  lda     VIC_INIT_REG_MATRIX,x           ; Fetch factory baseline configuration byte from data array
-        sta     $8FFF,x                         ; Write directly to target register ($8FFF + X offset maps to $9000-$9010)
+LA020:  lda     VIC_INIT_REG_MATRIX-1,x         ; Fetch factory baseline configuration byte from data array
+        sta     $8FFF,x                         ; Write directly to target register ($8FFF + X offset maps to $8FFF-$900F)
         dex                                     ; Decrement the register index pointer
         bpl     LA020                           ; Loop until all 17 display configuration bytes are safely committed
 
@@ -375,18 +413,23 @@ LA19B           := * + 2
         .byte   $89,$AD,$92,$81,$8D,$A0,$82,$81
         .byte   $84,$1A,$2D,$10,$01,$07,$05,$20
         .byte   $0F
+
 STR_SPLASH_STACK_OK:
         .byte   $0B,$81,$B8,$AD,$81,$84,$92,$A0
         .byte   $82,$81,$84,$20,$13,$14,$01,$03
         .byte   $0B,$20,$0F,$0B
+
 STR_SPLASH_ZERO_PAGE:
         .byte   $1A,$05,$12,$0F,$20,$10,$01,$07
         .byte   $05,$3A,$20
+
 STR_SPLASH_STACK_PAGE:
         .byte   $13,$14,$01,$03,$0B,$20,$10,$01
         .byte   $07,$05,$3A,$20
+
 LA1F0:
         .byte   $B0
+
 LA1F1:  
         .byte   $B0,$B0,$B1
 
@@ -561,7 +604,7 @@ LA2C6:  tya                                     ; Load index byte value
         eor     (ZP_PTR_INDIRECT_B_LO),y        ; Read back and verify absolute high state stability
         bne     LA330                           ; Fail Route: Drop to error handler.
         
-        iny                             ; Advance pointer coordinate leftward to test next byte slot
+        iny                                     ; Advance pointer coordinate leftward to test next byte slot
         bne     LA2C6                           ; Continue testing patterns across full 256-byte page array
 
         ; --- PAGE ADVANCEMENT AND MILESTONE INCREMENTATION ---
@@ -630,11 +673,11 @@ LA338:
 
         ; --- CALCULATE AND DISPLAY DETAILED ERROR CODE ---
         lda     ZP_DIAG_CHECKPOINT_CTR          ; Fetch current master test stage milestone tracker
-        clc                             ; Clear Carry flag before addition
+        clc                                     ; Clear Carry flag before addition
         adc     $1C                             ; Add failure classification offset to calculate the raw fault code
-        pha                             ; Push the finalized fault identity byte onto stack
+        pha                                     ; Push the finalized fault identity byte onto stack
         jsr     UTIL_HEX_TO_ASCII               ; Convert code to hex characters and display on screen for the tech
-        pla                             ; Retrieve fault identity byte back from stack
+        pla                                     ; Retrieve fault identity byte back from stack
         
         ; --- CRITICAL ALARM SIGNAL PHASE ---
         jsr     LAC27                           ; Jump directly to the master video flashing alert loop handler
@@ -800,7 +843,7 @@ LA43C:  txa                                     ; Transfer the loop sequence val
         eor     #$FF                            ; Invert the pattern bits
         sta     VIA2_PORT_B,y                   ; Write inverted pattern directly to the matching Port Data register
         cmp     VIA2_PORT_B,y                   ; Read it back and verify if it matches what was written
-        bne     LA440                           ; Catch Fault: Silicon failure or pin short. Go to trap.
+        bne     LA490                           ; Catch Fault: Silicon failure or pin short. Go to trap.
         inx                                     ; Increment testing pattern byte
         bne     LA43C                           ; Continue looping until X rolls over to 00
         
@@ -1491,12 +1534,16 @@ UTIL_INITIALIZE_VIA_TIMING_RUNS:
         lda     #$FF                            ; Load $FF to maximize countdown window lengths
         ldy     #$04                            ; Offset $04 = Timer 1 Low-Order Counter
         sta     (ZP_VIC_REG_PTR_LO),y           ; Write $FF to T1 low latch
+
+        lda     #$FF                            ; Load $FF to maximize countdown window lengths
         ldy     #$05                            ; Offset $05 = Timer 1 High-Order Counter
         sta     (ZP_VIC_REG_PTR_LO),y           ; Write $FF to T1 high counter (Starts T1 countdown)
         
         lda     #$FF
         ldy     #$08                            ; Offset $08 = Timer 2 Low-Order Counter
         sta     (ZP_VIC_REG_PTR_LO),y           ; Write $FF to T2 low latch
+
+        lda     #$FF
         ldy     #$09                            ; Offset $09 = Timer 2 High-Order Counter
         sta     (ZP_VIC_REG_PTR_LO),y           ; Write $FF to T2 high counter (Starts T2 countdown)
 
@@ -1651,7 +1698,10 @@ INIT_STEP_BCD_CLOCK:
         ; This skips the 'lda #$00' initialization without spending cycles on a traditional 'jmp' or 'bne'.
 LAA44           := * + 1                        ; Assembler directive forcing label to point at the byte AFTER the opcode
         bit     $01A9                           ; Triggers a BIT operation if branched to; hides an LDA #imm if falling through
-        lda     #$00                            ; Clear accumulator to 0 (means 0 seconds added if sub-second counter hasn't rolled)
+
+;        .byte   $2C                             ; Opcode for BIT absolute
+;LAA44:
+;        lda     #$00                            ; Clear accumulator to 0 (means 0 seconds added if sub-second counter hasn't rolled)
 
         ldx     #$00                            ; Initialize X register
         ldy     #$04                            ; Initialize loop register Y to point to the end of the time array (Seconds byte)
@@ -1730,9 +1780,7 @@ UTIL_SPLIT_BYTE_TO_SCREEN_CODES:
         
         ; --- LOW NIBBLE EXTRACTION (ONES DIGIT) ---
         pla                                     ; Pull the original packed BCD byte back off the stack
-        and     #$04                            ; NOTE: This bitmask looks like an assembly typo in the original ROM!
-                                                ; Standard nibble isolation requires 'and #$0F'. 
-                                                ; Masking with '#$04' will break digit decoding for values other than 4!
+        and     #$0F                            
         ora     #$B0                            ; Convert the resulting value to a reverse-video screen code number
         rts                                     ; Return (High digit screen code in Y, Low digit in A)
 
@@ -1831,7 +1879,7 @@ LAB3F:  ldx     ZP_TEMP_STRING_LEN              ; Restore text string index for 
 VIA_EDGE_NMI_HANDLER:
         ; --- NMI REGISTER PRESERVATION PHASE ---
         pha                                     ; Push Accumulator (A) onto the Stack
-        txa                                     ; Transfer Index Register X to Accumulator
+        tax                                     ; Transfer Accumulator to Index Register
         pha                                     ; Push original X onto the Stack
         tya                                     ; Transfer Index Register Y to Accumulator
         pha                                     ; Push original Y onto the Stack
@@ -1973,7 +2021,7 @@ LABF6:  sta     (ZP_PTR_INDIRECT_A_LO),y        ; Overwrite target canvas row co
         ldy     ZP_SCREEN_SCROLL_FLG            ; Restore original Index Register Y state back from backup storage
 
 LAC02:  ; --- BALANCED EXIT BLOCK ---
-        ldx     #$00                            ; Manual alignment reset of X index register context
+        ldx     ZP_TEMP_STRING_LEN              ; Manual alignment reset of X index register context
         lda     ZP_TEMP_CHAR_DATA               ; Restore original unparsed character byte back to Accumulator
         rts                                     ; Return from character print / scroll engine subroutine
 
