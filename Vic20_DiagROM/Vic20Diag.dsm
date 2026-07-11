@@ -1,5 +1,5 @@
 ; da65 V2.19 - Git cc3c40c
-; Created:    2026-07-11 13:58:47
+; Created:    2026-07-11 14:16:16
 ; Input file: vc-20-diag.324173-01_blk5.bin
 ; Page:       1
 
@@ -911,7 +911,7 @@ LA6FF:  lda     ZP_STRING_SELECT_IDX
         lda     LA749,x
         tax
         jsr     UTIL_PRINT_STRING
-        jsr     UTIL_REFRESH_VIC_COLOR_BARS
+        jsr     UTIL_INITIALIZE_VIA_TIMING_RUNS
         jsr     UTIL_VALIDATE_HARDWARE_TIMING
         inc     ZP_STRING_SELECT_IDX
         dec     ZP_LOOP_LIMIT_CTR
@@ -930,7 +930,7 @@ LA728:  lda     ZP_STRING_SELECT_IDX
         ldy     LA749+1,x
         tax
         jsr     UTIL_PRINT_STRING
-        jsr     UTIL_REFRESH_VIC_COLOR_BARS
+        jsr     UTIL_INITIALIZE_VIA_TIMING_RUNS
         cli
         jsr     UTIL_VALIDATE_HARDWARE_TIMING
         inc     ZP_STRING_SELECT_IDX
@@ -1127,7 +1127,7 @@ STR_SOUND_TEST_PTR:
         .byte   " SOUND TEST:"
 
         .byte   $0D,$00
-UTIL_REFRESH_VIC_COLOR_BARS:
+UTIL_INITIALIZE_VIA_TIMING_RUNS:
         inc     ZP_DIAG_CHECKPOINT_CTR
         lda     #$7F
         ldy     #$0E
@@ -1136,10 +1136,10 @@ UTIL_REFRESH_VIC_COLOR_BARS:
         lda     (ZP_VIC_REG_PTR_LO),y
         sta     (ZP_VIC_REG_PTR_LO),y
         ldx     ZP_STRING_SELECT_IDX
-        ldy     VIC_TABLE_REG_OFFSETS,x
-        lda     VIC_TABLE_PAL_GEOMETRY,x
+        ldy     VIA_TABLE_TARGET_REG_OFFSETS,x
+        lda     VIA_TABLE_PCR_EDGE_CONFIGS,x
         sta     (ZP_VIC_REG_PTR_LO),y
-        lda     VIC_TABLE_SCREEN_COLS,x
+        lda     VIA_TABLE_ACR_TIMER_MODES,x
         ldy     #$0C
         sta     (ZP_VIC_REG_PTR_LO),y
         lda     #$00
@@ -1158,32 +1158,32 @@ UTIL_REFRESH_VIC_COLOR_BARS:
         ldy     #$09
         sta     (ZP_VIC_REG_PTR_LO),y
         ldy     #$0B
-        lda     VIC_TABLE_SYNC_MARKERS,x
+        lda     VIA_TABLE_SHIFT_REG_SYNCS,x
         sta     (ZP_VIC_REG_PTR_LO),y
         ldy     #$0D
         lda     (ZP_VIC_REG_PTR_LO),y
         sta     (ZP_VIC_REG_PTR_LO),y
         ldy     #$0E
-        lda     VIC_TABLE_AUDIO_VOICES,x
+        lda     VIA_TABLE_IER_INT_MASKS,x
         sta     (ZP_VIC_REG_PTR_LO),y
         rts
 
 VIC_TABLE_NTSC_GEOMETRY:
         .byte   $00,$80,$C0,$E0,$0C,$C0,$FF,$FF
         .byte   $FF,$FF
-VIC_TABLE_PAL_GEOMETRY:
+VIA_TABLE_PCR_EDGE_CONFIGS:
         .byte   $80,$00,$E0,$C0,$0E,$0C,$FF,$FF
         .byte   $FF,$FF
-VIC_TABLE_SCREEN_COLS:
+VIA_TABLE_ACR_TIMER_MODES:
         .byte   $01,$00,$10,$00,$40,$20,$00,$00
         .byte   $00,$00
-VIC_TABLE_AUDIO_VOICES:
+VIA_TABLE_IER_INT_MASKS:
         .byte   $82,$82,$90,$90,$88,$88,$C0,$A0
         .byte   $C0,$A0
-VIC_TABLE_REG_OFFSETS:
+VIA_TABLE_TARGET_REG_OFFSETS:
         .byte   $0F,$0F,$1C,$1C,$1C,$1C,$05,$09
         .byte   $05,$09
-VIC_TABLE_SYNC_MARKERS:
+VIA_TABLE_SHIFT_REG_SYNCS:
         .byte   $00,$00,$00,$00,$00,$00,$FF,$00
         .byte   $FF,$00
 VIC_TABLE_ROW_SPACERS_A:
@@ -1344,7 +1344,7 @@ UTIL_VALIDATE_HARDWARE_TIMING:
         lda     #$FF
         sta     ZP_INT_EXPECTED_FLG
         ldx     ZP_STRING_SELECT_IDX
-        lda     VIC_TABLE_REG_OFFSETS,x
+        lda     VIA_TABLE_TARGET_REG_OFFSETS,x
         clc
         adc     ZP_VIC_REG_PTR_LO
         sta     ZP_PTR_INDIRECT_A_LO
@@ -1404,7 +1404,7 @@ VIA_EDGE_IRQ_HANDLER:
         beq     ERR_HANDLER_CATASTROPHIC_IRQ
         sta     ZP_INT_TRIGGERED_FLG
         ldy     ZP_STRING_SELECT_IDX
-        lda     VIC_TABLE_AUDIO_VOICES,y
+        lda     VIA_TABLE_IER_INT_MASKS,y
         and     #$7F
         ldy     #$0D
         and     (ZP_VIC_REG_PTR_LO),y
