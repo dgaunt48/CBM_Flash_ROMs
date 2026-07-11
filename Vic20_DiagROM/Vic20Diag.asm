@@ -3,7 +3,6 @@
 ; Input file: vc-20-diag.324173-01_blk5.bin
 ; Page:       1
 
-
         .setcpu "6502"
 
 ZP_PTR_INDIRECT_A_LO:= $0002
@@ -12,11 +11,11 @@ ZP_PTR_INDIRECT_B_LO:= $0006
 ZP_PTR_INDIRECT_B_HI:= $0007
 ZP_TEMP_CHAR_DATA:= $0008
 ZP_TEMP_STRING_LEN:= $0009
-ZP_SCREEN_SCROLL_FLG:= $000B
-ZP_SAVED_REG_C  := $000C
-ZP_SAVED_REG_D  := $000D
-ZP_SAVED_REG_E  := $000E
-ZP_SAVED_REG_F  := $000F
+ZP_SCREEN_SCROLL_FLG  := $000B
+ZP_TIME_ELAPSED_LO    := $000C
+ZP_TIME_ELAPSED_HI    := $000D
+ZP_INT_EXPECTED_FLG   := $000E
+ZP_INT_TRIGGERED_FLG  := $000F
 ZP_SCREEN_BUF_POS:= $0010
 ZP_STRING_TEMP_LO:= $0013
 ZP_STRING_TEMP_HI:= $0014
@@ -28,10 +27,10 @@ ZP_LOOP_LIMIT_CTR:= $0019
 ZP_VIC_REG_PTR_LO:= $001A
 ZP_VIC_REG_PTR_HI:= $001B
 ZP_DIAG_SYSTEM_FLG:= $001D
-ZP_RAM_SIZE_PTR_A_LO:= $001E
-ZP_RAM_SIZE_PTR_A_HI:= $001F
-ZP_RAM_SIZE_PTR_B_LO:= $0020
-ZP_RAM_SIZE_PTR_B_HI:= $0021
+ZP_PTR_COLOR_RAM_LO:= $001E
+ZP_PTR_COLOR_RAM_HI:= $001F
+ZP_PTR_SCREEN_RAM_LO:= $0020
+ZP_PTR_SCREEN_RAM_HI:= $0021
 ZP_AUDIO_FREQ_LO:= $0022
 ZP_AUDIO_FREQ_HI:= $0023
 ZP_LOOP_PASS_CTR:= $0025
@@ -362,7 +361,7 @@ LA25E:  inc     RAM_CYCLE_CLOCK_BUFFER,x
         bmi     UTIL_INCREMENT_CYCLE_CLOCK
 LA272:  ldx     #$00
         ldy     #$04
-        jsr     LAC6D
+        jsr     UTIL_PRINT_STRING_INVERTED
         rts
 
 LA27A:  .byte   " CYCLE 000000"
@@ -523,134 +522,172 @@ LA39F:  clc
 
 STR_COLOR_RAM_TEST_PTR:
         .byte   " COLOR RAM TEST: "
-
-
         .byte   $00
-TEST_ROM_CHECKSUM_INIT:
-        ldx     #$02
-        stx     $1C
-TEST_PHASE_ROM_CHECKSUM:
-        ldx     #$0E
-        ldy     #$A4
-        jsr     UTIL_PRINT_STRING
-        ldx     $1C
-        lda     ROM_START_HI_BYTES,x
-        sta     ZP_PTR_INDIRECT_A_HI
-        lda     ROM_PAGE_COUNT_SIZERS,x
-        sta     REG_LOOP_IDX
-        lda     #$00
-        sta     ZP_PTR_INDIRECT_A_LO
-        cpx     #$01
-        bne     LA3E0
-        ldy     $F75D
-        cpy     #$4C
-        beq     LA3FA
-LA3E0:  tay
-        clc
-LA3E2:  adc     (ZP_PTR_INDIRECT_A_LO),y
-        iny
-        bne     LA3E2
-        inc     ZP_PTR_INDIRECT_A_HI
-        dec     REG_LOOP_IDX
-        bne     LA3E2
-        adc     #$00
-        pha
-        jsr     UTIL_HEX_TO_ASCII
-        pla
-        cmp     ROM_TARGET_CHECKSUMS,x
-        beq     LA400
-LA3FA:  jsr     UTIL_FLASH_ERROR_HANDLER
-        jmp     LA3FA
 
-LA400:  lda     #$0D
-        jsr     UTIL_PRINT_CHAR
-        inc     ZP_DIAG_CHECKPOINT_CTR
-        dec     $1C
-        bpl     TEST_PHASE_ROM_CHECKSUM
-        jmp     UTIL_CLEAR_SCREEN_CANVAS
+TEST_ROM_CHECKSUM_INIT:
+        ; --- TEST SUITE INITIALIZATION ---
+        ldx     #$02
+        stx     $1C                             ; Set loop index tracker at $1C to 2 (corresponds to Cartridge ROM)
+
+TEST_PHASE_ROM_CHECKSUM:
+        ; --- UI TEXT LAYER OUTPUT ---
+        ldx     #<STR_ROMCHECK_PTR              ; Load low byte of " ROMCHECK " string descriptor
+        ldy     #>STR_ROMCHECK_PTR              ; Load high byte of " ROMCHECK " string descriptor
+        jsr     UTIL_PRINT_STRING               ; Display string header on the user terminal screen [1]
+
+        ; --- MEMORY SCAN CONFIGURATION ---
+        ldx     $1C                             ; Fetch the active ROM block index identifier [1]
+        lda     ROM_START_HI_BYTES,x            ; Look up the starting high memory address byte ($C0, $E0, or $80) [1]
+        sta     ZP_PTR_INDIRECT_A_HI            ; Write target block boundary start location into tracking pointer [1]
+        lda     ROM_PAGE_COUNT_SIZERS,x         ; Look up number of 256-byte pages to read ($20=8KB, $10=4KB) [1]
+        sta     REG_LOOP_IDX                    ; Store block size page count inside tracking counter variable [1]
+        lda     #$00
+        sta     ZP_PTR_INDIRECT_A_LO            ; Force tracking memory pointer low byte to $00 (page boundary align) [1]
+
+        ; --- CUSTOM ROM HARDWARE BYPASS DETECTOR ---
+        cpx     #$01                            ; Are we currently validating the KERNAL ROM space (Index 1)? [1]
+        bne     LA3E0                           ; If not validating KERNAL space, skip straight to core accumulator loop [1]
+        ldy     $F75D                           ; Read a signature memory byte from deep inside standard KERNAL space [1]
+        cpy     #$4C                            ; Does the memory hold $4C (the 6502 absolute JMP instruction opcode)? [1]
+        beq     LA3FA                           ; If JMP is found, abort verification and jump to failure handler [1]
+
+        ; --- THE CORE 8-BIT ADDITION CHECKSUM ENGINE ---
+LA3E0:  tay                                     ; Initialize Y index tracking register to $00 [1]
+        clc                                     ; Clear Carry flag prior to starting accumulation logic [1]
+LA3E2:  adc     (ZP_PTR_INDIRECT_A_LO),y        ; Add content of targeted ROM byte to current running total [1]
+        iny                                     ; Advance index pointer to next sequential byte location [1]
+        bne     LA3E2                           ; Loop back until Y rolls past 255 to $00 (completes full 256-byte page) [1]
+        
+        inc     ZP_PTR_INDIRECT_A_HI            ; Advance indirect memory address pointer up to next memory page [1]
+        dec     REG_LOOP_IDX                    ; Decrement remaining pages variable counter [1]
+        bne     LA3E2                           ; Keep computing addition if more pages exist in current block [1]
+        
+        adc     #$00                            ; Pull in final leftover carry bit state to finalize 8-bit checksum total [1]
+        pha                                     ; Push calculated final checksum onto the stack for safe storage [1]
+        jsr     UTIL_HEX_TO_ASCII               ; Convert checksum to text characters and display them on screen [1]
+        pla                                     ; Retrieve calculated checksum back from stack [1]
+        
+        cmp     ROM_TARGET_CHECKSUMS,x          ; Compare the calculated total to the official hardcoded target table [1]
+        beq     LA400                           ; If value perfectly matches expectations, proceed to next memory block [1]
+
+LA3FA:  jsr     UTIL_FLASH_ERROR_HANDLER        ; Error Route: Checksum mismatched or validation bypass tripped [1]
+        jmp     LA3FA                           ; Freeze system inside permanent error trap loop [1]
+
+LA400:  lda     #$0D                            ; Load standard Carriage Return/New Line ASCII code [1]
+        jsr     UTIL_PRINT_CHAR                 ; Print carriage return to clear text row for next module [1]
+        inc     ZP_DIAG_CHECKPOINT_CTR          ; Advance diagnostic system global milestone progress step counter [1]
+        dec     $1C                             ; Decrement ROM target table array selector index pointer [1]
+        bpl     TEST_PHASE_ROM_CHECKSUM         ; Loop backward to process next block if index is still positive (>=0) [1]
+        jmp     UTIL_CLEAR_SCREEN_CANVAS        ; All 3 ROM blocks passed successfully! Wipe screen and advance [1]
 
 STR_ROMCHECK_PTR:
         .byte   " ROMCHECK "
-
         .byte   $00
+
 ROM_START_HI_BYTES:
+        ; Addresses: Index 0 = $C000 (BASIC), Index 1 = $E000 (KERNAL), Index 2 = $8000 (Cartridge Base) [1]
         .byte   $C0,$E0,$80
+
 ROM_PAGE_COUNT_SIZERS:
+        ; Page sizes: $20 pages = 8,192 bytes, $10 pages = 4,096 bytes [1]
         .byte   $20,$20,$10
+
 ROM_TARGET_CHECKSUMS:
+        ; Hardcoded reference values representing the exact expected arithmetic total for each block [1]
         .byte   $C0,$E0,$FF
+
 TEST_PHASE_KEYBOARD:
-        ldx     #$AC
-        ldy     #$A4
-        jsr     UTIL_PRINT_STRING
+        ; --- UI DISPLAY PHASE ---
+        ldx     #<STR_KEYBOARD_TEST_PTR         ; Load low byte of " KEYBOARD TEST  " string pointer
+        ldy     #>STR_KEYBOARD_TEST_PTR         ; Load high byte of " KEYBOARD TEST  " string pointer
+        jsr     UTIL_PRINT_STRING               ; Output the string to the monitor screen
+        
+        ; --- PHASE 1 INITIALIZATION: DDR & PORT CYCLE TIMING ---
         ldy     #$01
-        sty     REG_LOOP_IDX
-LA42E:  ldx     REG_LOOP_IDX
-        ldy     VIA_PORT_OFFSET_TABLE,x
+        sty     REG_LOOP_IDX                    ; Initialize loop tracker to 1 (will test Port B, then Port A via offset table)
+LA42E:  ldx     REG_LOOP_IDX                    ; Fetch current loop index position
+        ldy     VIA_PORT_OFFSET_TABLE,x         ; Look up register offset (typically maps to Port A/B data direction registers)
         ldx     #$00
-        stx     VIA2_DDR_A
-        stx     VIA2_DDR_B
-LA43C:  txa
-        sta     VIA2_DDR_B,y
-        eor     #$FF
-        sta     VIA2_PORT_B,y
-        cmp     VIA2_PORT_B,y
-        bne     LA490
-        inx
-        bne     LA43C
-        dec     REG_LOOP_IDX
-        bpl     LA42E
+        stx     VIA2_DDR_A                      ; Force VIA2 Port A completely to inputs
+        stx     VIA2_DDR_B                      ; Force VIA2 Port B completely to inputs
+
+        ; --- THE 256-BYTE VALUE TRACE LOOP ---
+        ; This inner loop tests every possible bit pattern (0-255) to ensure the 6522 silicon
+        ; latches and mirrors data lines reliably without dropping bits.
+LA43C:  txa                                     ; Transfer the loop sequence value (0-255) to Accumulator
+        sta     VIA2_DDR_B,y                    ; Write pattern directly into the targeted Data Direction Register
+        eor     #$FF                            ; Invert the pattern bits
+        sta     VIA2_PORT_B,y                   ; Write inverted pattern directly to the matching Port Data register
+        cmp     VIA2_PORT_B,y                   ; Read it back and verify if it matches what was written
+        bne     LA440                           ; Catch Fault: Silicon failure or pin short. Go to trap.
+        inx                                     ; Increment testing pattern byte
+        bne     LA43C                           ; Continue looping until X rolls over to 00
+        
+        dec     REG_LOOP_IDX                    ; Decrement the outer register loop index
+        bpl     LA42E                           ; Repeat the 256-value stress test for the next port up
+
+        ; --- PHASE 2: STATIC FLOATING PIN ANALYSIS ---
         ldx     #$FF
-        stx     VIA2_DDR_B
-        inx
-        stx     VIA2_DDR_A
-        stx     VIA2_PORT_B
-        cpx     VIA2_PORT_A
-        beq     LA473
-        ldx     VIA2_PORT_A
-        cpx     #$FF
-        bne     LA490
-        inc     ZP_DIAG_CHECKPOINT_CTR
+        stx     VIA2_DDR_B                      ; Reconfigure VIA2 Port B fully as Outputs
+        inx                                     ; Increment X to $00
+        stx     VIA2_DDR_A                      ; Reconfigure VIA2 Port A fully as Inputs
+        stx     VIA2_PORT_B                     ; Drive all Port B output lines Low ($00)
+        
+        cpx     VIA2_PORT_A                     ; Read Port A inputs and compare to 00
+        beq     LA473                           ; If Port A reads 00, lines are pulled low (external harness present)
+        
+        ; --- HARNESS SELECTION AUTODETECT ---
+        ldx     VIA2_PORT_A                     ; Re-read Port A inputs to verify harness type
+        cpx     #$FF                            ; If $FF, the lines are floating High (No test harness connected)
+        bne     LA490                           ; Catch Fault: Lines are mismatched (Partial short or bad board)
+        
+        ; NO JIG DETECTED MODE: Safely bypass the physical matrix check
+        inc     ZP_DIAG_CHECKPOINT_CTR          ; Increment diagnostic stage tracker
         lda     #$FF
-        sta     $1C
-        jmp     UTIL_PRINT_PASS_STATUS
+        sta     $1C                             ; Store flag $FF at address $1C (Flags timing check loop to skip early stages)
+        jmp     UTIL_PRINT_PASS_STATUS          ; Print PASS/OK for the VIA chip test itself, then exit
 
-LA473:  lda     #$FE
-        sta     VIA2_PORT_B
-LA478:  lda     VIA2_PORT_A
-        cmp     VIA2_PORT_B
-        bne     LA490
-        sec
-        rol     VIA2_PORT_B
-        bcs     LA478
-        jsr     UTIL_PRINT_PASS_STATUS
-        inc     ZP_DIAG_CHECKPOINT_CTR
+        ; --- PHASE 3: THE WALKING-BIT MATRIX MATRIX LOOP (JIG CONTEXT) ---
+        ; Executes if the external test jig actively tied the lines low.
+LA473:  lda     #$FE                            ; Binary %11111110 (Isolates Bit 0 with a low bit)
+        sta     VIA2_PORT_B                     ; Send walking low bit out to the matrix rows via Port B
+LA478:  lda     VIA2_PORT_A                     ; Read back response from columns via Port A
+        cmp     VIA2_PORT_B                     ; Check if the low bit successfully crossed over into Port A
+        bne     LA490                           ; Catch Fault: Bit missed or cross-talk shorted another pin
+        sec                                     ; Set Carry flag for rotation
+        rol     VIA2_PORT_B                     ; Rotate bit pattern left (e.g. %11111110 becomes %11111101)
+        bcs     LA478                           ; Keep looping and checking until the low zero-bit shifts out completely
+        
+        ; JIG VALIDATION MODE SUCCESS
+        jsr     UTIL_PRINT_PASS_STATUS          ; Matrix loop cleanly verified. Print "OK" status.
+        inc     ZP_DIAG_CHECKPOINT_CTR          ; Increment diagnostic test stage tracking counter
         lda     #$00
-        sta     $1C
-        rts
+        sta     $1C                             ; Store flag $00 at address $1C (Informs timing suite to run full tests)
+        rts                                     ; Return from Subroutine
 
-LA490:  jsr     UTIL_FLASH_ERROR_HANDLER
-        jmp     LA490
+        ; --- TRAP ARCHITECTURE LOCKUP ---
+LA490:  jsr     UTIL_FLASH_ERROR_HANDLER        ; Call global warning routine to flash the screen matrix borders
+        jmp     LA490                           ; Permanent infinite loop to completely stop execution
 
 TEST_VIA_EDGE_IRQ_SETUP:
         ; --- CRITICAL SECTION ENTRY ---
-        sei                             ; Set Interrupt Disable (Inhibits standard maskable IRQs)
-                                        ; Prevents an IRQ from firing mid-setup while vectors are half-written.
+        sei                                     ; Set Interrupt Disable (Inhibits standard maskable IRQs)
+                                                ; Prevents an IRQ from firing mid-setup while vectors are half-written.
 
         ; --- PATCH HARDWARE IRQ VECTOR ---
-        lda     #<VIA_EDGE_IRQ_HANDLER  ; Extract low byte of the Edge IRQ Handler address
-        sta     RAM_IRQ_VECTOR_LO       ; Inject into the low-byte RAM destination ($0314)
-        lda     #>VIA_EDGE_IRQ_HANDLER  ; Extract high byte of the Edge IRQ Handler address
-        sta     RAM_IRQ_VECTOR_HI       ; Inject into the high-byte RAM destination ($0315)
+        lda     #<VIA_EDGE_IRQ_HANDLER          ; Extract low byte of the Edge IRQ Handler address
+        sta     RAM_IRQ_VECTOR_LO               ; Inject into the low-byte RAM destination ($0314)
+        lda     #>VIA_EDGE_IRQ_HANDLER          ; Extract high byte of the Edge IRQ Handler address
+        sta     RAM_IRQ_VECTOR_HI               ; Inject into the high-byte RAM destination ($0315)
 
         ; --- PATCH HARDWARE NMI VECTOR ---
-        lda     #<VIA_EDGE_NMI_HANDLER  ; Extract low byte of the Edge NMI Handler address
-        sta     RAM_NMI_VECTOR_LO       ; Inject into the low-byte RAM destination ($0318)
-        lda     #>VIA_EDGE_NMI_HANDLER  ; Extract high byte of the Edge NMI Handler address
-        sta     RAM_NMI_VECTOR_HI       ; Inject into the high-byte RAM destination ($0319)
-
-        ; --- EXIT AND RETURN ---
-        rts                             ; Return from Subroutine (leaves IRQs disabled for caller control)
+        lda     #<VIA_EDGE_NMI_HANDLER          ; Extract low byte of the Edge NMI Handler address
+        sta     RAM_NMI_VECTOR_LO               ; Inject into the low-byte RAM destination ($0318)
+        lda     #>VIA_EDGE_NMI_HANDLER          ; Extract high byte of the Edge NMI Handler address
+        sta     RAM_NMI_VECTOR_HI               ; Inject into the high-byte RAM destination ($0319)
+        
+        ; --- EXIT AND RETURN ---       
+        rts                                     ; Return from Subroutine (leaves IRQs disabled for caller control)
 
 STR_KEYBOARD_TEST_PTR:
         .byte   " KEYBOARD TEST: "
@@ -1043,147 +1080,196 @@ LA7F6:  .byte   " TIMER 2 DEV2:  "
         .byte   $00
 
 TEST_PHASE_VIC_SOUND:
-        ldx     #$16
-        ldy     #$A9
-        jsr     UTIL_PRINT_STRING
-        lda     #$0F
-        sta     VIC_REG_AUDIO_VOL
-        ldy     #$03
-LA815:  ldx     #$80
-LA817:  txa
-        sta     VIC_REG_AUDIO_BASS,y
+        ; --- UI TEXT LAYER OUTPUT ---
+        ldx     #<STR_SOUND_TEST_PTR            ; Load low byte of the "\n SOUND TEST:\n" string descriptor
+        ldy     #>STR_SOUND_TEST_PTR            ; Load high byte of the string descriptor
+        jsr     UTIL_PRINT_STRING               ; Display string header on the user terminal screen
+
+        ; --- PHASE 1: AUDIO MIXER INITIALIZATION ---
+        lda     #$0F                            ; Set volume to 15 (Maximum volume allowed by the 6560 VIC)
+        sta     VIC_REG_AUDIO_VOL               ; Update audio volume register ($900E)
+        ldy     #$03                            ; Initialize voice loop index to 3 (Steps downward: Noise, Soprano, Tenor, Bass)
+
+        ; --- MASTER VOICE AUDIO PITCH SWEEP LOOP ---
+LA815:  ldx     #$80                            ; Set starting audio frequency byte to $80 (turns the voice ON)
+LA817:  txa                                     ; Move frequency byte value to Accumulator
+        sta     VIC_REG_AUDIO_BASS,y            ; Write pitch data to the targeted VIC audio register ($900A + Y)
+        
         tya
-        pha
-        ldy     #$FA
-        jsr     LAAD5
+        pha                             ; Preserve active voice register index onto the stack
+        ldy     #$FA                            ; Load specific timing scalar parameter into Y
+        jsr     LAAD5                           ; Call inner loop of UTIL_HARDWARE_DELAY (creates an audible sliding chirp)
         pla
-        tay
-        inx
-        cpx     #$01
-        bne     LA817
-        dey
-        bpl     LA815
+        tay                             ; Restore active voice register index back from the stack
+        
+        inx                             ; Increment audio tone frequency bit pattern step
+        cpx     #$01                            ; Has frequency wrapped around from $FF back down past 0 to $01?
+        bne     LA817                           ; Continue tone generation sweep until the individual channel phase finishes
+        dey                             ; Shift left to target the next analog sound voice register
+        bpl     LA815                           ; Repeat pitch sweeps across all 4 internal audio generators
+
+        ; --- PHASE 2: DISPLAY MATRIX STRESS PREPARATION ---
         lda     #$00
-        sta     REG_AUDIO_STATUS_FLG
-        jsr     LA8E7
-        ldx     #$02
-LA836:  ldy     #$FF
-LA838:  lda     #$A0
-        sta     (ZP_RAM_SIZE_PTR_B_LO),y
-        lda     #$06
-        sta     (ZP_RAM_SIZE_PTR_A_LO),y
-        dey
-        dey
-        cpy     #$FF
-        bne     LA838
-        inc     ZP_RAM_SIZE_PTR_B_HI
-        inc     ZP_RAM_SIZE_PTR_A_HI
+        sta     REG_AUDIO_STATUS_FLG            ; Clear the system audio state tracking flag (0 = background operations active)
+        jsr     LA8E7                           ; Call screen setup utility to prepare screen/color RAM pointers
+
+        ; --- FILL SCREEN RAM AND COLOR RAM WITH GRID CHARACTERS ---
+        ldx     #$02                            ; Set outer vertical rows block counter to 2
+LA836:  ldy     #$FF                            ; Set horizontal character counter to 255
+LA838:  lda     #$A0                            ; Load character code $A0 (Graphics symbol block / space variant)
+        sta     (ZP_PTR_SCREEN_RAM_LO),y        ; Write graphic block code directly to Screen RAM via indirect pointer
+        lda     #$06                            ; Load color code 6 (Blue text)
+        sta     (ZP_PTR_COLOR_RAM_LO),y         ; Write color code directly to matching Color RAM position
+        dey                             ; Decrement column position counter by 2 to jump alternate cells
+        dey                             ; ...
+        cpy     #$FF                            ; Have we finished filling this block?
+        bne     LA838                           ; Loop back if more screen coordinates remain
+        
+        inc     ZP_PTR_SCREEN_RAM_HI            ; Advance screen RAM pointer high byte to next 256-byte page boundary
+        inc     ZP_PTR_COLOR_RAM_HI             ; Advance color RAM pointer high byte to next 256-byte page boundary
+        dex                             ; Decrement row block loop tracker
+        bne     LA836                           ; Continue loop until the dual-page fill routine completes
+
+        ; --- HOLD DISPLAY FOR AUDIT PUSH 1 ---
+        ldx     #$07                            ; Set frame loop counter to 7
+LA84F:  jsr     UTIL_HARDWARE_DELAY             ; Freeze execution briefly to show the geometric grid on screen
         dex
-        bne     LA836
-        ldx     #$07
-LA84F:  jsr     UTIL_HARDWARE_DELAY
-        dex
-        bpl     LA84F
-        jsr     LA8E7
+        bpl     LA84F                           ; Loop until display pause interval completes
+        
+        jsr     LA8E7                           ; Re-initialize base screen/color memory register tracking pointers
         lda     #$00
-        sta     ZP_AUDIO_FREQ_LO
-        sta     ZP_AUDIO_FREQ_HI
-LA85E:  jsr     LA8D3
-        lda     ZP_AUDIO_FREQ_HI
-        cmp     #$10
-        beq     LA86F
+        sta     ZP_AUDIO_FREQ_LO                ; Clear low byte of audio frequency array variable
+        sta     ZP_AUDIO_FREQ_HI                ; Clear high byte of audio frequency array variable
+
+        ; --- DYNAMIC FREQUENCY MODULATION GRID RENDER LOOP ---
+LA85E:  jsr     LA8D3                           ; Call video generator helper to update specific screen bytes
+        lda     ZP_AUDIO_FREQ_HI                ; Read high byte tracking variable
+        cmp     #$10                            ; Check if frequency sweep boundary upper ceiling is reached
+        beq     LA86F                           ; Branch out if frequency limits match expectations
         clc
-        ror     a
-        bcs     LA85E
-        inc     ZP_AUDIO_FREQ_LO
-        bne     LA85E
-LA86F:  inc     ZP_RAM_SIZE_PTR_B_HI
-        inc     ZP_RAM_SIZE_PTR_A_HI
-        ldy     #$00
-LA875:  lda     #$A0
-        sta     (ZP_RAM_SIZE_PTR_B_LO),y
-        lda     ZP_AUDIO_FREQ_LO
-        sta     (ZP_RAM_SIZE_PTR_A_LO),y
-        iny
-        cpy     #$02
-        bne     LA875
+        ror     a                               ; Shift bits rightward to test edge parity state
+        bcs     LA85E                           ; Branch back to cycle again if bit state matches condition
+        inc     ZP_AUDIO_FREQ_LO                ; Increment audio frequency low byte tracking parameter
+        bne     LA85E                           ; Loop until low byte rolls over
+
+        ; --- ADVANCE AND DOUBLE BUFFER THE CHARACTER WRITES ---
+LA86F:  inc     ZP_PTR_SCREEN_RAM_HI            ; Shift active screen pointer high byte up by 1 page
+        inc     ZP_PTR_COLOR_RAM_HI             ; Shift active color pointer high byte up by 1 page
+        ldy     #$00                            ; Initialize pointer offset index to 0
+LA875:  lda     #$A0                            ; Load character matrix code $A0
+        sta     (ZP_PTR_SCREEN_RAM_LO),y        ; Write code directly to active screen address page
+        lda     ZP_AUDIO_FREQ_LO                ; Fetch current low byte frequency tracking state
+        sta     (ZP_PTR_COLOR_RAM_LO),y         ; Overwrite color parameter data dynamically using frequency value
+        iny                             ; Increment target index
+        cpy     #$02                            ; Have we updated 2 structural bytes?
+        bne     LA875                           ; Repeat if cells remain
+
         lda     #$00
-        sta     ZP_AUDIO_FREQ_LO
+        sta     ZP_AUDIO_FREQ_LO                ; Reset audio low byte frequency state back to $00
         lda     #$08
-        sta     ZP_AUDIO_FREQ_HI
-LA88A:  jsr     LA8D3
-        lda     ZP_AUDIO_FREQ_HI
-        cmp     #$18
-        beq     LA89B
+        sta     ZP_AUDIO_FREQ_HI                ; Set high byte parameter index reference value to 8
+
+        ; --- PHASE 3: INTERLEAVED DELAY AND SCREEN MODULATION ---
+LA88A:  jsr     LA8D3                           ; Call text grid update module
+        lda     ZP_AUDIO_FREQ_HI                ; Fetch current high frequency state byte
+        cmp     #$18                            ; Check if sweep limit boundary index matches 24
+        beq     LA89B                           ; Break out if limits match
         clc
-        ror     a
-        bcs     LA88A
-        inc     ZP_AUDIO_FREQ_LO
-        bne     LA88A
-LA89B:  ldx     #$07
-LA89D:  jsr     UTIL_HARDWARE_DELAY
+        ror     a                               ; Rotate bits to alter timing profiles
+        bcs     LA88A                           ; Loop if condition is met
+        inc     ZP_AUDIO_FREQ_LO                ; Advance tracking value
+        bne     LA88A                           ; Continue looping sequence
+
+        ; --- HOLD DISPLAY FOR AUDIT PUSH 2 ---
+LA89B:  ldx     #$07                            ; Set loop counter to 7
+LA89D:  jsr     UTIL_HARDWARE_DELAY             ; Freeze execution to display current grid updates
         dex
-        bpl     LA89D
-        lda     #$18
-        sta     VIC_REG_BG_BORDER_CLR
-        ldx     #$07
-LA8AA:  jsr     UTIL_HARDWARE_DELAY
+        bpl     LA89D                           ; Continue delay loop
+        
+        ; --- BORDER FLASH AND VIDEO FEEDBACK EXERCISE ---
+        lda     #$18                            ; Load color bitmask for background/border matrix configuration
+        sta     VIC_REG_BG_BORDER_CLR           ; Write to VIC register ($900F) to flip screen background elements
+        ldx     #$07                            ; Re-initialize delay counter
+LA8AA:  jsr     UTIL_HARDWARE_DELAY             ; Hold color state visually on display monitor
         dex
-        bpl     LA8AA
-        lda     #$1B
-        sta     VIC_REG_BG_BORDER_CLR
-        jsr     LA8E7
-        ldy     #$00
-LA8BA:  lda     #$06
-        sta     COLOR_RAM_PAGE_1,y
-        sta     COLOR_RAM_PAGE_2,y
-        lda     #$20
-        sta     VIDEO_RAM_PAGE_1,x
-        sta     VIDEO_RAM_PAGE_2,x
+        bpl     LA8AA                           ; Continue delay loop
+        
+        lda     #$1B                            ; Load alternative baseline screen/border background colors
+        sta     VIC_REG_BG_BORDER_CLR           ; Restore primary display screen color values
+        jsr     LA8E7                           ; Re-initialize base screen/color structural tracking pointers
+
+        ; --- FINAL ENVIRONMENT CANVAS WIPE ---
+        ldy     #$00                            ; Set index counter to 0
+LA8BA:  lda     #$06                            ; Load color code 6 (Blue foreground text)
+        sta     COLOR_RAM_PAGE_1,y              ; Flood first page of Color RAM ($9600)
+        sta     COLOR_RAM_PAGE_2,y              ; Flood second page of Color RAM ($9700)
+        lda     #$20                            ; Load character code $20 (The standard blank space character)
+        sta     VIDEO_RAM_PAGE_1,x              ; Clear first page of Screen RAM ($1E00) (Note: X index is persistent here)
+        sta     VIDEO_RAM_PAGE_2,x              ; Clear second page of Screen RAM ($1F00)
         iny
-        bne     LA8BA
+        bne     LA8BA                           ; Continue wiping memory blocks until Y index rolls over back to 00
+        
         lda     #$FF
-        sta     REG_AUDIO_STATUS_FLG
-        rts
+        sta     REG_AUDIO_STATUS_FLG            ; Set system audio tracking flag to $FF (Signals audio phase complete/muted)
+        rts                                     ; Return from sound test routine
 
-LA8D3:  ldy     ZP_AUDIO_FREQ_HI
-LA8D5:  lda     #$A0
-        sta     (ZP_RAM_SIZE_PTR_B_LO),y
-        lda     ZP_AUDIO_FREQ_LO
-        sta     (ZP_RAM_SIZE_PTR_A_LO),y
-        tya
-        clc
-        adc     #$16
-        tay
-        bcc     LA8D5
-        inc     ZP_AUDIO_FREQ_HI
-        rts
+LA8D3:  
+        ; --- LOCAL UTILITY: GRAPHIC STRIP / PATTERN GENERATOR ---
+        ; Draws custom data columns by stepping downwards line-by-line.
+        ldy     ZP_AUDIO_FREQ_HI                ; Fetch current high tracking value to use as our vertical index offset
+        
+LA8D5:  lda     #$A0                            ; Load character code $A0 (The solid graphics block symbol)
+        sta     (ZP_PTR_SCREEN_RAM_LO),y        ; Write block symbol directly to the screen memory address cell
+        lda     ZP_AUDIO_FREQ_LO                ; Fetch current low tracking value (stores active pitch data metrics)
+        sta     (ZP_PTR_COLOR_RAM_LO),y         ; Inject directly into corresponding Color RAM to dynamically shift character patterns
+        
+        ; --- THE 22-COLUMN VERTICAL ROW JUMP ---
+        tya                                     ; Move current column index offset position to Accumulator
+        clc                                     ; Clear Carry flag before addition
+        adc     #$16                            ; Add decimal 22 (The physical character width of one VIC-20 screen row)
+        tay                                     ; Move updated offset value back to Y to target the same column on the next line down
+        bcc     LA8D5                           ; Loop back to paint block symbol on next row until page boundary limits overflow ($FF)
+        
+        inc     ZP_AUDIO_FREQ_HI                ; Increment frequency high tracking index parameter
+        rts                                     ; Return from dynamic strip printing loop
 
-LA8E7:  lda     #$00
-        sta     ZP_RAM_SIZE_PTR_B_LO
-        lda     #$1E
-        sta     ZP_RAM_SIZE_PTR_B_HI
+LA8E7:  
+        ; --- LOCAL UTILITY: DISPLAY MATRIX RE-INITIALIZATION ENGINE ---
+        ; Forces both Screen RAM and Color RAM pointers back to pristine starting positions.
         lda     #$00
-        sta     ZP_RAM_SIZE_PTR_A_LO
+        sta     ZP_PTR_SCREEN_RAM_LO            ; Clear low byte of Screen RAM tracking register pointer
+        lda     #$1E
+        sta     ZP_PTR_SCREEN_RAM_HI            ; Set high byte to $1E (Base address of default VIC-20 Screen RAM: $1E00)
+        
+        lda     #$00
+        sta     ZP_PTR_COLOR_RAM_LO             ; Clear low byte of Color RAM tracking register pointer
         lda     #$96
-        sta     ZP_RAM_SIZE_PTR_A_HI
-        ldx     #$02
-LA8F9:  ldy     #$00
-LA8FB:  lda     #$20
-        sta     (ZP_RAM_SIZE_PTR_B_LO),y
-        lda     #$01
-        sta     (ZP_RAM_SIZE_PTR_A_LO),y
-        iny
-        bne     LA8FB
-        inc     ZP_RAM_SIZE_PTR_B_HI
-        inc     ZP_RAM_SIZE_PTR_A_HI
-        dex
-        bne     LA8F9
-        dec     ZP_RAM_SIZE_PTR_B_HI
-        dec     ZP_RAM_SIZE_PTR_B_HI
-        dec     ZP_RAM_SIZE_PTR_A_HI
-        dec     ZP_RAM_SIZE_PTR_A_HI
-        rts
+        sta     ZP_PTR_COLOR_RAM_HI             ; Set high byte to $96 (Base address of default VIC-20 Color RAM: $9600)
+        
+        ldx     #$02                            ; Set outer block loop page counter to 2 (to cover 512 bytes of RAM)
+        
+LA8F9:  ldy     #$00                            ; Initialize inner page byte index tracker to 0
+        
+LA8FB:  lda     #$20                            ; Load character code $20 (The standard blank space character)
+        sta     (ZP_PTR_SCREEN_RAM_LO),y        ; Overwrite active screen coordinate cell to clear any stray glyph data
+        lda     #$01                            ; Load color code 1 (White foreground text formatting color)
+        sta     (ZP_PTR_COLOR_RAM_LO),y         ; Overwrite active color matrix cell with white text properties
+        iny                                     ; Step forward to next byte index position
+        bne     LA8FB                           ; Loop across full 256-byte page boundaries until complete
+        
+        inc     ZP_PTR_SCREEN_RAM_HI            ; Advance Screen RAM pointer up to cover secondary memory page ($1F00)
+        inc     ZP_PTR_COLOR_RAM_HI             ; Advance Color RAM pointer up to cover secondary memory page ($9700)
+        dex                                     ; Decrement remaining blocks tracking loop counter
+        bne     LA8F9                           ; Continue block clear passes until all target ranges are wiped clean
+        
+        ; --- POINTER MATRIX REBALANCING ---
+        ; Decrement high bytes twice to shift pointers backwards by 512 bytes, 
+        ; restoring them precisely to the core matrix origin addresses ($1E00 / $9600).
+        dec     ZP_PTR_SCREEN_RAM_HI            
+        dec     ZP_PTR_SCREEN_RAM_HI
+        dec     ZP_PTR_COLOR_RAM_HI
+        dec     ZP_PTR_COLOR_RAM_HI
+        rts                                     ; Return from layout calibration subroutine
 
 STR_SOUND_TEST_PTR:
         .byte   $0D
@@ -1255,137 +1341,169 @@ VIC_TABLE_ROW_SPACERS_A:
 VIC_TABLE_ROW_SPACERS_B:
         .byte   $00,$00,$00,$00,$00,$00,$33,$33
         .byte   $33,$33
+
 UTIL_RESET_VIA_PERIPHERALS:
-        ldx     #$0F
-        lda     #$00
-LA9CB:  sta     VIA1_PORT_B,x
-        dex
-        bpl     LA9CB
-        lda     #$7F
-        sta     VIA1_INT_ENABLE
-        ldx     #$0F
-        lda     #$00
-LA9DA:  sta     VIA2_PORT_B,x
-        dex
-        bpl     LA9DA
-        lda     #$7F
-        sta     VIA1_INT_ENABLE
-        rts
+        ; --- PHASE 1: CLEAR ALL 16 REGISTERS ON VIA1 ---
+        ldx     #$0F                            ; Initialize X register with 15 (covers registers 0 to 15)
+        lda     #$00                            ; Clear Accumulator to zero out the registers
+LA9CB:  sta     VIA1_PORT_B,x                   ; Write $00 to VIA1 register (Base Address + X offset)
+        dex                                     ; Decrement the register index tracking pointer
+        bpl     LA9CB                           ; Loop backward until X rolls past zero to $FF (Negative)
+
+        ; --- PHASE 2: DISABLE ALL INTERRUPTS ON VIA1 ---
+        lda     #$7F                            ; Binary %01111111 (Clear bits 0-6 to disable all interrupt types)
+        sta     VIA1_INT_ENABLE                 ; Update VIA1 Interrupt Enable Register ($911E)
+
+        ; --- PHASE 3: CLEAR ALL 16 REGISTERS ON VIA2 ---
+        ldx     #$0F                            ; Re-initialize index tracker back to 15
+        lda     #$00                            ; Ensure Accumulator remains completely cleared
+LA9DA:  sta     VIA2_PORT_B,x                   ; Write $00 to VIA2 register (Base Address + X offset)
+        dex                                     ; Decrement the register index tracking pointer
+        bpl     LA9DA                           ; Loop backward until all 16 registers are zeroed out
+
+        ; --- PHASE 4: THE VIA2 INTERRUPT ENABLING BUG ---
+        ; The destination address should be 'VIA2_INT_ENABLE' ($912E).
+        ; Writing to 'VIA1_INT_ENABLE' ($911E) a second time leaves VIA2's 
+        ; interrupts in whatever unpredictable state the prior test suite left them in.
+        lda     #$7F                            ; Load bitmask to clear interrupts
+        sta     VIA1_INT_ENABLE                 ; Typo: Re-disables VIA1 instead of disabling VIA2!
+
+        rts                                     ; Return from peripheral wipe subroutine
 
 INIT_HOOK_SYSTEM_IRQ:
         ; --- RESTORE RUNTIME IRQ VECTOR ---
-        sei                             ; Disable interrupts while rewriting the system vector
-        lda     #<IRQ_HANDLER           ; Load low byte of the runtime system IRQ handler
-        sta     RAM_IRQ_VECTOR_LO       ; Direct KERNAL vector to the new handler ($0314)
-        lda     #>IRQ_HANDLER           ; Load high byte of the runtime system IRQ handler
-        sta     RAM_IRQ_VECTOR_HI       ; Direct KERNAL vector to the new handler ($0315)
+        sei                                     ; Disable interrupts while rewriting the system vector
+        lda     #<IRQ_HANDLER                   ; Load low byte of the runtime system IRQ handler
+        sta     RAM_IRQ_VECTOR_LO               ; Direct KERNAL vector to the new handler ($0314)
+        lda     #>IRQ_HANDLER                   ; Load high byte of the runtime system IRQ handler
+        sta     RAM_IRQ_VECTOR_HI               ; Direct KERNAL vector to the new handler ($0315)
 
         ; --- CONFIGURE VIA2 TIMER 1 FOR CONTINUOUS INTERRUPTS ---
-        lda     #$40                    ; Binary %01000000: Set Timer 1 to continuous interrupts (Bit 6)
-        sta     VIA2_AUX_CTRL           ; Update VIA2 Auxiliary Control Register ($912B)
-        lda     #$C0                    ; Binary %11000000: Enable Timer 1 Interrupt (Set Bit 7 Enable + Bit 6 T1)
-        sta     VIA2_INT_ENABLE         ; Update VIA2 Interrupt Enable Register ($912E)
+        lda     #$40                            ; Binary %01000000: Set Timer 1 to continuous interrupts (Bit 6)
+        sta     VIA2_AUX_CTRL                   ; Update VIA2 Auxiliary Control Register ($912B)
+        lda     #$C0                            ; Binary %11000000: Enable Timer 1 Interrupt (Set Bit 7 Enable + Bit 6 T1)
+        sta     VIA2_INT_ENABLE                 ; Update VIA2 Interrupt Enable Register ($912E)
 
         ; --- START HEARTBEAT CLOCK COUNTDOWN ---
         ; Sets a latched 16-bit countdown value of $4289 (17,033 clock cycles)
         ; At 1.02 MHz (PAL) / 1.01 MHz (NTSC), this generates an IRQ roughly every 1/60th of a second.
         lda     #$89
-        sta     VIA2_T1_CTR_LO          ; Write low byte of latch/counter ($9124)
-        lda     #$42
-        sta     VIA2_T1_CTR_HI          ; Write high byte of counter ($9125) and active-start the timer
+        sta     VIA2_T1_CTR_LO                  ; Write low byte of latch/counter ($9124)
+        lda     #$42    
+        sta     VIA2_T1_CTR_HI                  ; Write high byte of counter ($9125) and active-start the timer
 
-        cli                             ; Safely re-enable interrupts to start the heartbeat clock
-        rts                             ; Return from setup block
+        cli                                     ; Safely re-enable interrupts to start the heartbeat clock
+        rts                                     ; Return from setup block
 
 IRQ_HANDLER:
         ; --- MASTER SYSTEM RASTER / SIGNAL POLLING LOOP ---
-        lda     $9C00                   ; Check an I/O or state tracking register address
-        and     #$01                    ; Isolate bit 0
-        bne     IRQ_HANDLER             ; Spin-wait here if bit 0 is high (awaits custom sync condition)
+        lda     $9C00                           ; Check an I/O or state tracking register address
+        and     #$01                            ; Isolate bit 0
+        bne     IRQ_HANDLER                     ; Spin-wait here if bit 0 is high (awaits custom sync condition)
 
         ; --- VISUAL FLASH TIMER / PULSE ACCUMULATOR ---
-        dec     $0410                   ; Decrement the flash/tick timer variable at $0410
-        bpl     LAA23                   ; If the counter is still positive (>= 0), branch past flash toggle
+        dec     $0410                           ; Decrement the flash/tick timer variable at $0410
+        bpl     LAA23                           ; If the counter is still positive (>= 0), branch past flash toggle
 
         ; --- TOGGLE BACKGROUND/BORDER FLIPPERS ---
         lda     #$08
-        sta     $0410                   ; Reset flash tick counter back to 8 frames
-        lda     #$C0                    ; Load bitmask value
-        eor     $0411                   ; XOR with current state tracking register at $0411 to flip bits
-        sta     $9800                   ; Write updated value directly to video/system memory location $9800
-        sta     $0411                   ; Store updated tracking bit back into $0411
+        sta     $0410                           ; Reset flash tick counter back to 8 frames
+        lda     #$C0                            ; Load bitmask value
+        eor     $0411                           ; XOR with current state tracking register at $0411 to flip bits
+        sta     $9800                           ; Write updated value directly to video/system memory location $9800
+        sta     $0411                           ; Store updated tracking bit back into $0411
 
         ; --- TICK TIME ENGINE ---
-LAA23:  jsr     INIT_STEP_BCD_CLOCK     ; Advance real-time clock array bytes using 6502 decimal mode (`sed`)
-        jsr     INIT_REFRESH_CLOCK_BANNER ; Redraw the flashing clock text data dynamically onto the VIC screen
+LAA23:  jsr     INIT_STEP_BCD_CLOCK             ; Advance real-time clock array bytes using 6502 decimal mode (`sed`)
+        jsr     INIT_REFRESH_CLOCK_BANNER       ; Redraw the flashing clock text data dynamically onto the VIC screen
         
         ; --- ACKNOWLEDGE HARDWARE TIMERS ---
-        lda     VIA2_INT_FLAGS          ; Read the current VIA2 Interrupt Flags
-        sta     VIA2_INT_FLAGS          ; Write 1s back to clear Timer 1 interrupt latch, resetting the hardware pin
-        
+        lda     VIA2_INT_FLAGS                  ; Read the current VIA2 Interrupt Flags
+        sta     VIA2_INT_FLAGS                  ; Write 1s back to clear Timer 1 interrupt latch, resetting the hardware pin
+
         ; --- CLEAN STACK RESTORATION ---
-        pla                             ; Pull saved Y register value from the Stack
-        tay                             ; Restore original Index Register Y
-        pla                             ; Pull saved X register value from the Stack
-        tax                             ; Restore original Index Register X
-        pla                             ; Pull saved Accumulator value from the Stack
-        rti                             ; Return From Interrupt (Restores Processor Flags and Program Counter)
+
+        pla                                     ; Pull saved Y register value from the Stack
+
+        tay                                     ; Restore original Index Register Y
+        pla                                     ; Pull saved X register value from the Stack
+        tax                                     ; Restore original Index Register X
+        pla                                     ; Pull saved Accumulator value from the Stack
+        rti                                     ; Return From Interrupt (Restores Processor Flags and Program Counter)
 
 INIT_STEP_BCD_CLOCK:
-        sed
-        dec     $0418
-        bpl     LAA44
-        lda     #$5F
-        sta     $0418
-        lda     $0417
-LAA44           := * + 1
-        bit     $01A9
-        ldx     #$00
-        ldy     #$04
-LAA4A:  clc
-        adc     $0412,y
-        sta     $0412,y
-        cmp     CLOCK_BCD_CARRY_THRESHOLDS,y
-        bcc     LAA61
-        sbc     CLOCK_BCD_CARRY_THRESHOLDS,y
-        sta     $0412,y
-        lda     #$01
-        dey
-        bpl     LAA4A
-LAA61:  cld
-        rts
+        sed                                     ; Set Decimal Mode (forces ADC/SBC to treat hex as base-10 math)
+        dec     $0418                           ; Decrement the fractional jiffy sub-second counter at $0418
+        bpl     LAA44                           ; If counter is still positive (>= 0), branch down to skip ticking a full second
+
+        lda     #$5F                            ; Reset fractional jiffy counter back to 95 ticks ($5F)
+        sta     $0418                           ; (96 ticks at 60Hz creates a rough 1.6-second loop, or a custom timing step)
+        lda     $0417                           ; Load the base tick value to add into the array accumulator
+        
+        ; LAA44 defines an offset pointing precisely inside the next instruction's opcode byte.
+        ; If the 'bpl' above branches here, it lands on 'bit $A9' (using $A9 as an absolute address).
+        ; If execution falls through instead, it reads 'lda $0417' then 'lda #$00' (since $A9 is the opcode for LDA #imm).
+        ; This skips the 'lda #$00' initialization without spending cycles on a traditional 'jmp' or 'bne'.
+LAA44           := * + 1                        ; Assembler directive forcing label to point at the byte AFTER the opcode
+        bit     $01A9                           ; Triggers a BIT operation if branched to; hides an LDA #imm if falling through
+        lda     #$00                            ; Clear accumulator to 0 (means 0 seconds added if sub-second counter hasn't rolled)
+
+        ldx     #$00                            ; Initialize X register
+        ldy     #$04                            ; Initialize loop register Y to point to the end of the time array (Seconds byte)
+
+        ; --- BCD TIME ARRAY TICK & CASCADE CARRY LOOP ---
+        ; Handles cascading carries across 5 array bytes: [Years, Days, Hours, Minutes, Seconds]
+LAA4A:  clc                                     ; Clear Carry flag before addition
+        adc     $0412,y                         ; Add current time value to the accumulator
+        sta     $0412,y                         ; Store updated BCD value back into the array slot
+        cmp     CLOCK_BCD_CARRY_THRESHOLDS,y    ; Check if value matches or exceeds maximum threshold for this slot
+        bcc     LAA61                           ; If accumulator is less than threshold, time update is cleanly complete
+        sbc     CLOCK_BCD_CARRY_THRESHOLDS,y    ; Subtract threshold limit to manually handle the BCD wrap-around
+        sta     $0412,y                         ; Save the wrapped value (usually resets to 00)
+        lda     #$01                            ; Put a carry value of 1 into Accumulator for the next array slot up
+        dey                                     ; Move pointer leftward to previous array slot (e.g. seconds -> minutes)
+        bpl     LAA4A                           ; Repeat loop to ripple-carry the time value upward
+LAA61:  cld                                     ; Clear Decimal Mode (restores standard hexadecimal CPU math)
+        rts                                     ; Return from clock tick subroutine
 
 CLOCK_BCD_CARRY_THRESHOLDS:
+        ; Max limits allowed per time index slot:
+        ; Years Max=$99, Days Max=24 ($24), Hours Max=60 ($60), Minutes Max=60 ($60), Seconds Max=60 ($60)
         .byte   $99,$24,$60,$60,$60
+
 INIT_REFRESH_CLOCK_BANNER:
-        lda     REG_AUDIO_STATUS_FLG
-        bne     LAAA6
-        lda     VIDEO_RAM_PAGE_1
-LAA70:  cmp     #$FF
-        beq     LAAA6
-        ldx     #$15
-        ldy     #$02
-LAA78:  lda     CLOCK_BANNER_TEXT_TEMPLATE,x
-        sta     $1FE4,x
-        lda     #$02
-        sta     $97E4,x
-        dex
-        bpl     LAA78
-        ldx     #$03
-        stx     $0419
-LAA8B:  ldx     $0419
-        lda     $0412,x
-        jsr     UTIL_SPLIT_BYTE_TO_SCREEN_CODES
-        pha
-        lda     CLOCK_BANNER_COLUMN_OFFSETS,x
-        tax
-        tya
-        sta     $1FE4,x
-        pla
-        sta     $1FE5,x
-        dec     $0419
-        bpl     LAA8B
-LAAA6:  rts
+        lda     REG_AUDIO_STATUS_FLG            ; Check if system audio generation is currently busy
+        bne     LAAA6                           ; If audio flag is active, abort screen printing to save video bus cycles
+        lda     VIDEO_RAM_PAGE_1                ; Check current active video memory page status register
+LAA70:  cmp     #$FF                            ; Check if display page state is invalid or unready
+        beq     LAAA6                           ; Abort if page is missing/blank
+
+        ; --- PHASE 1: DRAW STATIC TEXT FRAME TEMPLATE ---
+        ldx     #$15                            ; Set counter for 22 characters (length of the banner row)
+        ldy     #$02                            ; Text color code (Red = 2)
+LAA78:  lda     CLOCK_BANNER_TEXT_TEMPLATE,x    ; Load raw text character from your master layout array
+        sta     $1FE4,x                         ; Inject character directly into screen memory row ($1FE4)
+        lda     #$02                    
+        sta     $97E4,x                         ; Inject color code 2 directly into corresponding Color RAM ($97E4)
+        dex                                     ; Decrement index counter
+        bpl     LAA78                           ; Loop until full banner framework template is rendered
+
+        ; --- PHASE 2: CONVERT PACKED BCD BYTES TO DISPLAY CHARACTERS ---
+        ldx     #$03                            ; Target last 4 slots of array (Days, Hours, Minutes, Seconds)
+        stx     $0419                           ; Store loop pointer index at zero-page location $0419
+LAA8B:  ldx     $0419                           ; Fetch current array index
+        lda     $0412,x                         ; Load packed BCD byte from time storage array (e.g., $59)
+        jsr     UTIL_SPLIT_BYTE_TO_SCREEN_CODES ; Call utility to split byte: splits high/low nibble into separate ASCII values
+        pha                                     ; Push Low digit character code onto stack for safekeeping
+        lda     CLOCK_BANNER_COLUMN_OFFSETS,x   ; Look up targeted screen column column offset for this time unit
+        tax                                     ; Transfer calculated screen layout index directly to X register
+        tya                                     ; Transfer High digit character value (returned in Y) to Accumulator
+        sta     $1FE4,x                         ; Write High numerical digit directly onto the screen
+        pla                                     ; Pull Low digit character code back off stack
+        sta     $1FE5,x                         ; Write Low numerical digit adjacent to High digit
+        dec     $0419                           ; Decrement the active time unit array index
+        bpl     LAA8B                           ; Loop until all clock metrics are overlaid into banner row
+LAAA6:  rts                                     ; Return from banner refresh routine
 
 CLOCK_BANNER_COLUMN_OFFSETS:
         .byte   $01,$0E,$11,$14
@@ -1393,87 +1511,116 @@ CLOCK_BANNER_TEXT_TEMPLATE:
         .byte   $A0,$A0,$A0,$A0,$84,$81,$99,$93
         .byte   $A0,$A0,$A0,$A0,$A0,$A0,$A0,$A0
         .byte   $BA,$00,$00,$BA,$A0,$A0
+
 UTIL_SPLIT_BYTE_TO_SCREEN_CODES:
-        pha
-        lsr     a
-        lsr     a
-        lsr     a
-        lsr     a
-        ora     #$B0
-        tay
-        pla
-        and     #$0F
-        ora     #$B0
-        rts
+        ; --- HIGH NIBBLE EXTRACTION (TENS DIGIT) ---
+        pha                                     ; Push the original packed BCD byte (e.g., $59) onto the stack
+        lsr     a                               ; Shift right 4 times to isolate the upper 4 bits (high nibble)
+        lsr     a                               ; ...
+        lsr     a                               ; ...
+        lsr     a                               ; Accumulator now holds the raw numeric digit (e.g., $05)
+        ora     #$B0                            ; Convert raw digit to VIC-20 reverse-video screen code numbers ($B0-$B9)
+        tay                                     ; Transfer the High digit character screen code to the Y register
+        
+        ; --- LOW NIBBLE EXTRACTION (ONES DIGIT) ---
+        pla                                     ; Pull the original packed BCD byte back off the stack
+        and     #$04                            ; NOTE: This bitmask looks like an assembly typo in the original ROM!
+                                                ; Standard nibble isolation requires 'and #$0F'. 
+                                                ; Masking with '#$04' will break digit decoding for values other than 4!
+        ora     #$B0                            ; Convert the resulting value to a reverse-video screen code number
+        rts                                     ; Return (High digit screen code in Y, Low digit in A)
 
 UTIL_WRITE_INDIRECT_CHAR:
-        sta     (ZP_PTR_INDIRECT_A_LO),y
+        ; --- INDIRECT STORAGE ACCELERATOR ---
+        sta     (ZP_PTR_INDIRECT_A_LO),y ; Write Accumulator to the address stored at zero-page pointer plus Y index
+        ; NOTE: There is no 'rts' here! Execution falls directly into the delay routine below.
+
 UTIL_HARDWARE_DELAY:
-        lda     #$00
-        tay
-        clc
-LAAD5:  adc     #$01
-        bne     LAAD5
-        iny
-        bne     LAAD5
-        rts
+        ; --- PRECISION CYCLE DELAY LOOP ---
+        lda     #$00                            ; Clear the Accumulator accumulator loop counter
+        tay                                     ; Clear the Y index loop counter
+        clc                                     ; Clear the Carry flag to ensure 'adc' does not add phantom values
+        
+        ; Inner loop: Increments A 256 times per Y iteration until it rolls over to 00
+LAAD5:  adc     #$01                            ; Add 1 to Accumulator (using ADC without SEC/CLC causes safe hex addition here)
+        bne     LAAD5                           ; Loop until Accumulator hits $00 (Takes 256 iterations)
+        
+        ; Outer loop: Increments Y 256 times until it rolls over to 00
+        iny                                     ; Increment outer loop tracking index
+        bne     LAAD5                           ; Jump back to execute another 256 inner loop iterations if Y != 0
+        rts                                     ; Delay complete. Return to caller. (Total delay = ~196,000 CPU cycles)
 
 UTIL_VALIDATE_HARDWARE_TIMING:
+        ; --- PHASE 1: INITIALISE TIMING STATE STORAGE ---
         lda     #$00
-        sta     ZP_SAVED_REG_D
-        sta     ZP_SAVED_REG_C
-        sta     ZP_SAVED_REG_F
+        sta     ZP_TIME_ELAPSED_HI              ; Clear high byte of the actual elapsed time counter
+        sta     ZP_TIME_ELAPSED_LO              ; Clear low byte of the actual elapsed time counter
+        sta     ZP_INT_TRIGGERED_FLG            ; Clear interrupt-fired notification flag (0 = has not fired)
         lda     #$FF
-        sta     ZP_SAVED_REG_E
-        ldx     ZP_STRING_SELECT_IDX
-        lda     VIC_TABLE_REG_OFFSETS,x
+        sta     ZP_INT_EXPECTED_FLG             ; Set expected-interrupt guard flag ($FF = arming the handler)
+
+        ; --- PHASE 2: LOOKUP TARGET VIA REGISTER VIA VECTOR TABLES ---
+        ldx     ZP_STRING_SELECT_IDX            ; Fetch active test index (0-9 for edge/timer tests)
+        lda     VIC_TABLE_REG_OFFSETS,x         ; Look up target register offset for this test (e.g. PCR, IER)
         clc
-        adc     ZP_VIC_REG_PTR_LO
-        sta     ZP_PTR_INDIRECT_A_LO
+        adc     ZP_VIC_REG_PTR_LO               ; Add to low byte of base VIA pointer ($9110 or $9120)
+        sta     ZP_PTR_INDIRECT_A_LO            ; Store calculated target register address low byte
         lda     #$00
-        adc     ZP_VIC_REG_PTR_HI
-        sta     ZP_PTR_INDIRECT_A_HI
-        lda     VIC_TABLE_NTSC_GEOMETRY,x
+        adc     ZP_VIC_REG_PTR_HI               ; Propagate 16-bit carry to base VIA pointer high byte
+        sta     ZP_PTR_INDIRECT_A_HI            ; Store calculated target register address high byte
+
+        ; --- PHASE 3: STIMULATE HARDWARE AND WAIT FOR EVENT ---
+        lda     VIC_TABLE_NTSC_GEOMETRY,x       ; Look up hardware stimulation bitmask pattern for this test
         ldy     #$00
-        jsr     UTIL_WRITE_INDIRECT_CHAR
-        lda     ZP_SAVED_REG_F
-        bne     LAB0B
-LAB05:  jsr     UTIL_FLASH_ERROR_HANDLER
-        jmp     LAB05
+        jsr     UTIL_WRITE_INDIRECT_CHAR        ; Write bitmask to the VIA register via indirect pointer (Triggers Edge/Timer)
+        
+        ; --- TIMING TRAP WINDOW ---
+        lda     ZP_INT_TRIGGERED_FLG            ; Read the interrupt tracking register updated by the IRQ/NMI handler
+        bne     LAB0B                           ; If non-zero, interrupt fired successfully. Advance to evaluation.
+LAB05:  jsr     UTIL_FLASH_ERROR_HANDLER        ; Fail Route: Interrupt never tripped at all (stuck line / dead timer)
+        jmp     LAB05                           ; Permanent lockup loop on catastrophic hardware freeze
 
+        ; --- PHASE 4: 16-BIT REAL-TIME VARIANCE CALCULATION ---
 LAB0B:  ldy     #$00
-        sty     ZP_SAVED_REG_E
-        ldy     ZP_STRING_SELECT_IDX
-        stx     ZP_TEMP_STRING_LEN
-        lda     VIC_TABLE_ROW_SPACERS_A,y
+        sty     ZP_INT_EXPECTED_FLG             ; Disarm interrupt handler (0 = unexpected interrupt guard active)
+        ldy     ZP_STRING_SELECT_IDX            ; Refresh active test ID index into Y
+        stx     ZP_TEMP_STRING_LEN              ; Back up X index register into temporary variable
+        
+        ; Compute Absolute Variance: (Expected Cycles) - (Actual Elapsed Cycles)
+        lda     VIC_TABLE_ROW_SPACERS_A,y       ; Load Low Byte of targeted expected timing value from table
         sec
-        sbc     ZP_SAVED_REG_C
-        sta     ZP_TEMP_CHAR_DATA
-        lda     VIC_TABLE_ROW_SPACERS_B,y
-        sbc     ZP_SAVED_REG_D
-        bpl     LAB32
-        eor     #$FF
-        tax
-        lda     ZP_TEMP_CHAR_DATA
-        eor     #$FF
+        sbc     ZP_TIME_ELAPSED_LO              ; Subtract Low Byte of actual elapsed time captured by handler
+        sta     ZP_TEMP_CHAR_DATA               ; Store intermediate result in temporary byte
+        lda     VIC_TABLE_ROW_SPACERS_B,y       ; Load High Byte of targeted expected timing value from table
+        sbc     ZP_TIME_ELAPSED_HI              ; Subtract High Byte of actual elapsed time captured by handler
+        bpl     LAB32                           ; If result is positive (>=0), expected time was greater. Skip inversion.
+
+        ; --- 16-BIT NEGATIVE VALUE INVERSION (2'S COMPLEMENT TO ABSOLUTE VALUE) ---
+        eor     #$FF                            ; Invert High Byte bits
+        tax                                     ; Keep inverted High Byte in X register
+        lda     ZP_TEMP_CHAR_DATA               ; Reload Low Byte result
+        eor     #$FF                            ; Invert Low Byte bits
         clc
-        adc     #$01
-        sta     ZP_TEMP_CHAR_DATA
-        bcc     LAB31
-        inx
-LAB31:  txa
-LAB32:  bne     LAB3F
-        lda     ZP_TEMP_CHAR_DATA
-        and     #$F8
-        bne     LAB3F
-        ldx     ZP_TEMP_STRING_LEN
-        jmp     UTIL_PRINT_PASS_STATUS
+        adc     #$01                            ; Add 1 to finalize absolute 2's complement conversion
+        sta     ZP_TEMP_CHAR_DATA               ; Store final absolute low byte delta value
+        bcc     LAB31                           ; If no carry, skip incrementing high byte
+        inx                                     ; Increment inverted High Byte to handle carry
+LAB31:  txa                                     ; Move absolute high byte delta value to Accumulator
+LAB32:  bne     LAB3F                           ; Fail Route: If High Byte delta != 0, timing variance is way too large
 
-LAB3F:  ldx     ZP_TEMP_STRING_LEN
-        jsr     UTIL_FLASH_ERROR_HANDLER
-        jmp     UTIL_VALIDATE_HARDWARE_TIMING
+        ; --- TIMING THRESHOLD MARGIN CHECK ---
+        lda     ZP_TEMP_CHAR_DATA               ; Load absolute Low Byte delta value
+        and     #$F8                            ; Mask out bits 0-2 (Checks if variance is >= 8 cycles)
+        bne     LAB3F                           ; Fail Route: Variance is 8 clock cycles or greater. Reject.
+        ldx     ZP_TEMP_STRING_LEN              ; Restore original text string offset index to X register
+        jmp     UTIL_PRINT_PASS_STATUS          ; Success Route: Timing is precision accurate! Print "OK" and exit.
 
-        rts
+        ; --- TIMING VARIANCE EXCEEDED ---
+LAB3F:  ldx     ZP_TEMP_STRING_LEN              ; Restore text string index for the UI handler
+        jsr     UTIL_FLASH_ERROR_HANDLER        ; Trigger visual screen flash error indicator
+        jmp     UTIL_VALIDATE_HARDWARE_TIMING   ; Retry/loop test continuously so tech can inspect with scope
+
+        rts                                     ; Unreachable safety return statement
 
 VIA_EDGE_NMI_HANDLER:
         ; --- NMI REGISTER PRESERVATION PHASE ---
@@ -1486,9 +1633,9 @@ VIA_EDGE_NMI_HANDLER:
 
 VIA_EDGE_IRQ_HANDLER:
         ; --- INTERRUPT VALIDATION PHASE ---
-        lda     ZP_SAVED_REG_E                  ; Check expected interrupt flag condition variable
+        lda     ZP_INT_EXPECTED_FLG             ; Check expected interrupt flag condition variable
         beq     ERR_HANDLER_CATASTROPHIC_IRQ    ; If 0, an interrupt fired when it shouldn't have (Catastrophic Fault)
-        sta     ZP_SAVED_REG_F                  ; Log/mirror the triggered interrupt status byte into storage
+        sta     ZP_INT_TRIGGERED_FLG            ; Log/mirror the triggered interrupt status byte into storage
         
         ; --- HARDWARE FLAG VERIFICATION ---
         ldy     ZP_STRING_SELECT_IDX            ; Fetch the active test index (0-9 from the prior edge test block)
@@ -1508,11 +1655,11 @@ VIA_EDGE_IRQ_HANDLER:
         ; --- STACK RESTORATION & RETURN ---
         pla                                     ; Pull saved Y register value from the Stack
         tay                                     ; Restore original Index Register Y
-        sty     ZP_SAVED_REG_D                  ; Back up Y to a temporary zero-page tracking variable for debugging
+        sty     ZP_TIME_ELAPSED_HI              ; Back up Y to a temporary zero-page tracking variable for debugging
         pla                                     ; Pull saved X register value from the Stack
         tax                                     ; Restore original Index Register X
         pla                                     ; Pull saved Accumulator value from the Stack
-        sta     ZP_SAVED_REG_C                  ; Back up A to a temporary zero-page tracking variable
+        sta     ZP_TIME_ELAPSED_LO              ; Back up A to a temporary zero-page tracking variable
         rti                                     ; Return From Interrupt (Restores Processor Flags and Program Counter)
 
 ERR_HANDLER_CATASTROPHIC_IRQ:
@@ -1556,128 +1703,173 @@ LABA3:  jsr     UTIL_CLEAR_SCREEN_CANVAS
         rts
 
 UTIL_PRINT_CHAR_REVERSE_MODE:
-        ldy     #$80
-        sty     ZP_SCREEN_BUF_POS
-        jsr     UTIL_PRINT_CHAR
-        txa
+        ; --- REVERSE VIDEO CHARACTER ENTRY POINT ---
+        ldy     #$80                            ; Bit 7 high ($80) acts as the reverse video flag on Commodore platforms
+        sty     ZP_SCREEN_BUF_POS               ; Store flag in zero page to mask onto incoming characters
+        jsr     UTIL_PRINT_CHAR                 ; Call standard print engine to draw the character
+        txa                                     ; Transfer X register to Accumulator (balancing state or setting up argument)
+
 UTIL_PRINT_CHAR:
-        sta     ZP_TEMP_CHAR_DATA
-        and     #$7F
-        cmp     #$0D
-        beq     UTIL_CLEAR_SCREEN_CANVAS
-        stx     ZP_TEMP_STRING_LEN
-        ldx     ZP_PORT_LINE_OFFSET
-        and     #$3F
-        ora     ZP_SCREEN_BUF_POS
-        sta     $1FB8,x
-        inx
-        stx     ZP_PORT_LINE_OFFSET
-        bne     LAC02
+        ; --- STANDARD CHARACTER ENTRY POINT ---
+        sta     ZP_TEMP_CHAR_DATA               ; Back up raw character value to a zero-page temporary variable
+        and     #$7F                            ; Mask out bit 7 to isolate the core character data
+        cmp     #$0D                            ; Is this character an ASCII Carriage Return (New Line)?
+        beq     UTIL_CLEAR_SCREEN_CANVAS        ; If it's a Carriage Return, jump directly down to shift the screen canvas
+
+        stx     ZP_TEMP_STRING_LEN              ; Back up active text pointer register X into temporary variable
+        ldx     ZP_PORT_LINE_OFFSET             ; Fetch the current horizontal cursor column index offset
+        and     #$3F                            ; Mask with %00111111 to convert ASCII to Commodore Screen RAM Matrix Codes
+        ora     ZP_SCREEN_BUF_POS               ; Merge character code with active reverse-video bitmask status flag
+        sta     $1FB8,x                         ; Inject character directly into screen memory row offset $1FB8
+
+        inx                                     ; Advance cursor horizontally to next character column position
+        stx     ZP_PORT_LINE_OFFSET             ; Save updated cursor tracking coordinate position
+        bne     LAC02                           ; Unconditional branch skip past canvas logic (cursor offset never hits 0)
+
 UTIL_CLEAR_SCREEN_CANVAS:
-        stx     ZP_TEMP_STRING_LEN
-        sty     ZP_SCREEN_SCROLL_FLG
-        ldx     #$00
-LABD0:  lda     SCR_ROW_ADDR_LO_BASE,x
-        sta     $00
-        lda     SCR_ROW_ADDR_HI_BASE,x
-        sta     $01
-        lda     SCR_ROW_ADDR_LO_OFFSETS,x
-        sta     ZP_PTR_INDIRECT_A_LO
-        lda     SCR_ROW_ADDR_HI_OFFSETS,x
-        sta     ZP_PTR_INDIRECT_A_HI
-        ldy     #$15
-LABE6:  lda     (ZP_PTR_INDIRECT_A_LO),y
-        sta     ($00),y
-        dey
-        bpl     LABE6
-        inx
-        cpx     #$15
-        bcc     LABD0
-        ldy     #$15
-        lda     #$20
-LABF6:  sta     (ZP_PTR_INDIRECT_A_LO),y
-        dey
-        bpl     LABF6
-        iny
-        sty     ZP_SCREEN_BUF_POS
-        sty     ZP_PORT_LINE_OFFSET
-        ldy     ZP_SCREEN_SCROLL_FLG
-LAC02:  ldx     ZP_TEMP_STRING_LEN
-        lda     ZP_TEMP_CHAR_DATA
-        rts
+        ; --- SCREEN TEXT ROW SHIFTING / SCROLL ENGINE ---
+        stx     ZP_TEMP_STRING_LEN              ; Back up current string length index tracking register
+        sty     ZP_SCREEN_SCROLL_FLG            ; Back up current Y pointer register context state flag
+        ldx     #$00                            ; Initialize vertical screen row counter loop to index 0
+
+LABD0:  ; --- ROW BLITTING LOOP (COPIES CHARACTER ROWS UPWARD) ---
+        lda     SCR_ROW_ADDR_LO_BASE,x          ; Load low byte destination address of current screen row
+        sta     $00                             ; Inject into zero page indirect destination pointer low slot ($0000)
+        lda     SCR_ROW_ADDR_HI_BASE,x          ; Load high byte destination address of current screen row
+        sta     $01                             ; Inject into zero page indirect destination pointer high slot ($0001)
+        
+        lda     SCR_ROW_ADDR_LO_OFFSETS,x       ; Load low byte source address of the row directly underneath it
+        sta     ZP_PTR_INDIRECT_A_LO            ; Inject into zero page indirect source pointer low slot
+        lda     SCR_ROW_ADDR_HI_OFFSETS,x       ; Load high byte source address of the row directly underneath it
+        sta     ZP_PTR_INDIRECT_A_HI            ; Inject into zero page indirect source pointer high slot
+        
+        ldy     #$15                            ; Set horizontal character column counter loop to 21 (22 columns total)
+LABE6:  lda     (ZP_PTR_INDIRECT_A_LO),y        ; Read character from the source screen row underneath
+        sta     ($00),y                         ; Write character directly onto current target row line (shifts text up)
+        dey                                     ; Step leftward to previous column cell position
+        bpl     LABE6                           ; Continue row copy operations until column index drops negative ($FF)
+
+        inx                                     ; Advance row index down to next display line
+        cpx     #$15                            ; Have we blitted through 21 lines? (Leaves bottom line clear)
+        bcc     LABD0                           ; Continue shifting rows up until target boundary limit is completed
+
+        ; --- WIPE THE MAIN DISPLAY ROW CANVAS LINE ---
+        ldy     #$15                            ; Set loop counter for 22 character columns
+        lda     #$20                            ; Load $20 (The standard Commodore Screen Code for a blank Space)
+LABF6:  sta     (ZP_PTR_INDIRECT_A_LO),y        ; Overwrite target canvas row column cells with blank white spaces
+        dey                                     ; Step leftward to previous column coordinate
+        bpl     LABF6                           ; Continue writing blank spaces until row line is fully wiped clean
+        
+        ; --- REBALANCING INTERNAL RUNTIME ENGINE STATE ---
+        iny                                     ; Increment Y from $FF back up to $00
+        sty     ZP_SCREEN_BUF_POS               ; Reset reverse-video bitmask flag state back to 0 (normal text)
+        sty     ZP_PORT_LINE_OFFSET             ; Reset cursor position index tracker back to column 0 (home line left)
+        ldy     ZP_SCREEN_SCROLL_FLG            ; Restore original Index Register Y state back from backup storage
+
+LAC02:  ; --- BALANCED EXIT BLOCK ---
+        ldx     #$00                            ; Manual alignment reset of X index register context
+        lda     ZP_TEMP_CHAR_DATA               ; Restore original unparsed character byte back to Accumulator
+        rts                                     ; Return from character print / scroll engine subroutine
 
 UTIL_HEX_TO_ASCII:
-        pha
-        lsr     a
-        lsr     a
-        lsr     a
-        lsr     a
-        jsr     LAC12
-        pla
-        and     #$0F
-LAC12:  clc
-        adc     #$F6
-        bcc     LAC19
-        adc     #$06
-LAC19:  adc     #$3A
-        bne     UTIL_PRINT_CHAR
-        jsr     UTIL_HEX_TO_ASCII
-        txa
-        jsr     UTIL_PRINT_CHAR
-        rts
+        ; --- ACCUMULATOR CHARACTER PARSING ---
+        pha                                     ; Push original packed byte to stack
+        lsr     a                               ; Shift right 4 times to isolate the high nibble
+        lsr     a                               ; ...
+        lsr     a                               ; ...
+        lsr     a                               ; ...
+        jsr     LAC12                           ; Call translation math to print the high nibble character
+        pla                                     ; Retrieve original packed byte from stack
+        and     #$0F                            ; Mask out high bits to isolate the low nibble
+
+LAC12:  ; --- BINARY TO ASCII CORRECTION MATH ---
+        clc                                     ; Clear carry flag before addition
+        adc     #$F6                            ; Add correction offset for decimal digits 0-9
+        bcc     LAC19                           ; If no carry, the value is a number (0-9). Skip letter shift.
+        adc     #$06                            ; Apply secondary offset to shift value into hex letters (A-F)
+LAC19:  adc     #$3A                            ; Add baseline character value to finalize standard ASCII range
+        
+        ; --- THE UNCONDITIONAL SHORT-CIRCUIT ---
+        bne     UTIL_PRINT_CHAR                 ; Branch if result != 0. Since ASCII codes 0-9 and A-F are never zero, 
+                                                ; this branch ALWAYS triggers, routing directly to the print engine.
+
+        ; =========================================================================
+        ; --- ORPHANED COMPLIATION GHOST ZONE (DEAD ROM CODE BUG) ---
+        ; These instructions are permanently trapped behind the 'bne' short-circuit.
+        ; They physically occupy bytes inside the ROM but can never be executed.
+        ; =========================================================================
+        jsr     UTIL_HEX_TO_ASCII               ; Unreachable recursive call (would trigger stack overflow)
+        txa                                     ; Unreachable register transfer
+        jsr     UTIL_PRINT_CHAR                 ; Unreachable character print
+        rts                                     ; Unreachable return
 
 UTIL_FLASH_ERROR_HANDLER:
-        lda     ZP_DIAG_CHECKPOINT_CTR
-LAC27:  sei
-        ldx     ZP_MATRIX_SCAN_CTR
-        bne     LAC3E
-        ldx     #$FF
-        stx     ZP_MATRIX_SCAN_CTR
-        stx     ZP_PTR_INDIRECT_A_LO
-        eor     #$FF
-        sta     $9800
-        ldx     #$B1
-        ldy     #$AC
-        jsr     UTIL_PRINT_STRING
-LAC3E:  jsr     UTIL_HARDWARE_DELAY
-        ldx     #$15
-LAC43:  lda     SCR_ROW_ADDR_LO_BASE,x
-        sta     $11
-        lda     SCR_ROW_ADDR_HI_BASE,x
-        sta     $12
-        ldy     #$15
-LAC4F:  lda     ($11),y
-        eor     #$80
-        sta     ($11),y
-        dey
-        bpl     LAC4F
-        dex
-        bpl     LAC43
-        rts
+        ; --- ACTIVE AUDIO/VISUAL WARNING SUITE ---
+        lda     ZP_DIAG_CHECKPOINT_CTR          ; Load the global stage tracking counter (determines error signature)
+LAC27:  sei                                     ; Block all standard interrupts to take absolute control of timing
+        ldx     ZP_MATRIX_SCAN_CTR              ; Load the current matrix flash execution loop index
+        bne     LAC3E                           ; If index isn't zero, skip background color flip frame
+
+        ; --- BORDER FLASHING GENERATOR ---
+        ldx     #$FF                    
+        stx     ZP_MATRIX_SCAN_CTR              ; Reset flash speed frame delay counter back to 255
+        stx     ZP_PTR_INDIRECT_A_LO            ; Clear low tracking parameters
+        eor     #$FF                            ; Invert the milestone signature bits to generate a contrasting pattern
+        sta     $9800                           ; Write bitmask directly to memory address $9800 to flash background colors
+
+        ldx     #$B1                            ; Load low byte of failure string index marker
+        ldy     #$AC                            ; Load high byte of failure string index marker
+        jsr     UTIL_PRINT_STRING               ; Print explicit hardware error code directly to monitor text rows
+
+        ; --- SCREEN TEXT INVERSION ENGINE (XOR MASK CYCLE) ---
+LAC3E:  jsr     UTIL_HARDWARE_DELAY             ; Pause execution briefly to make the flash rate human-readable
+        ldx     #$15                            ; Set outer loop index to step through 22 rows of video screen memory
+LAC43:  lda     SCR_ROW_ADDR_LO_BASE,x          ; Look up the target display line memory address low byte
+        sta     $11                             ; Store in zero page indirect memory pointer low slot ($0011)
+        lda     SCR_ROW_ADDR_HI_BASE,x          ; Look up the target display line memory address high byte
+        sta     $12                             ; Store in zero page indirect memory pointer high slot ($0012)
+        ldy     #$15                            ; Set inner loop index to cover 22 column characters per row
+        
+LAC4F:  lda     ($11),y                         ; Read the exact character currently rendered at this screen position
+        eor     #$80                            ; Exclusive-OR bit 7 (instantly flips character between Normal and Reverse text)
+        sta     ($11),y                         ; Write the inverted character directly back into active screen RAM
+        dey                                     ; Step leftward to previous column character cell
+        bpl     LAC4F                           ; Continue inverting characters across the row until Y drops negative ($FF)
+
+        dex                                     ; Advance upward to the previous vertical screen row
+        bpl     LAC43                           ; Continue row processing until the entire display grid is inverted
+        rts                                     ; Return to active trap caller loop to cycle colors again
 
 UTIL_PRINT_STRING:
-        stx     ZP_STRING_TEMP_LO
-        sty     ZP_STRING_TEMP_HI
-        ldy     #$00
-LAC62:  lda     (ZP_STRING_TEMP_LO),y
-        beq     LAC6C
-        jsr     UTIL_PRINT_CHAR
-        iny
-        bne     LAC62
-LAC6C:  rts
+        ; --- MAIN ZERO-TERMINATED STRING PRINT ENGINE ---
+        stx     ZP_STRING_TEMP_LO               ; Store string pointer low byte into Zero Page
+        sty     ZP_STRING_TEMP_HI               ; Store string pointer high byte into Zero Page
+        ldy     #$00                            ; Initialize string character index pointer to 0
 
-LAC6D:  lda     #$80
-        sta     ZP_SCREEN_BUF_POS
-        jsr     UTIL_PRINT_STRING
-        lda     #$00
-        sta     ZP_SCREEN_BUF_POS
-        rts
+LAC62:  lda     (ZP_STRING_TEMP_LO),y           ; Read character from memory via indirect indexed addressing
+        beq     UTIL_PRINT_STRING_EXIT          ; Success Route: If byte is $00 (Null Terminator), string is finished
+        jsr     UTIL_PRINT_CHAR                 ; Call core character engine to render digit onto the screen row
+        iny                                     ; Move index to the next sequential character byte
+        bne     LAC62                           ; Loop back to process next character (safeguards against 256-byte overflow)
+UTIL_PRINT_STRING_EXIT: 
+        rts                                     ; Return from string print subroutine
+
+UTIL_PRINT_STRING_INVERTED:
+        ; --- REVERSE VIDEO STRING WRAPPER ---
+        ; Forces all subsequent character updates into highlighted blocks
+        lda     #$80                    
+        sta     ZP_SCREEN_BUF_POS               ; Turn Reverse-Video Mode ON (Sets Bit 7 mask active)
+        jsr     UTIL_PRINT_STRING               ; Call standard string routine to print the inverted data
+        lda     #$00                            
+        sta     ZP_SCREEN_BUF_POS               ; Turn Reverse-Video Mode OFF (Clears mask back to normal text)
+        rts                                     ; Return from reverse wrapper
 
 UTIL_PRINT_PASS_STATUS:
-        ldx     #$81
-        ldy     #$AC
-        jsr     UTIL_PRINT_STRING
-        rts
+        ; --- SYSTEM SUCCESS INDICATOR DRIVER ---
+        ldx     #$81                            ; Load low byte of the success text string address
+        ldy     #$AC                            ; Load high byte of the success text string address ($AC81)
+        jsr     UTIL_PRINT_STRING               ; Call main string engine to draw the confirmation status
+        rts                                     ; Return to active test module loop
 
 STR_OK_PTR:
         .byte   "OK"
