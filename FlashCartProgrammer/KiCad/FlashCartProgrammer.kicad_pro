@@ -50,7 +50,23 @@
         "silk_text_thickness": 0.15,
         "silk_text_upright": false,
         "zones": {
-          "min_clearance": 0.0
+          "border_display_style": 2,
+          "border_hatch_pitch": 0.5,
+          "corner_radius": 0.0,
+          "corner_smoothing": 0,
+          "fill_mode": 0,
+          "hatch_gap": 1.5,
+          "hatch_orientation": 0.0,
+          "hatch_smoothing_level": 0,
+          "hatch_smoothing_value": 0.1,
+          "hatch_thickness": 1.0,
+          "min_clearance": 0.0,
+          "min_island_area": 10.0,
+          "min_thickness": 0.25,
+          "pad_connection": 1,
+          "remove_islands": 0,
+          "thermal_relief_gap": 0.5,
+          "thermal_relief_spoke_width": 0.5
         }
       },
       "diff_pair_dimensions": [
@@ -81,7 +97,7 @@
         "footprint_filters_mismatch": "ignore",
         "footprint_symbol_field_mismatch": "warning",
         "footprint_symbol_mismatch": "warning",
-        "footprint_type_mismatch": "ignore",
+        "footprint_type_mismatch": "warning",
         "hole_clearance": "error",
         "hole_near_hole": "error",
         "hole_to_hole": "error",
@@ -118,12 +134,12 @@
         "too_many_vias": "error",
         "track_angle": "error",
         "track_dangling": "warning",
-        "track_not_centered_on_via": "ignore",
+        "track_not_centered_on_via": "warning",
         "track_on_post_machined_layer": "error",
         "track_segment_length": "error",
         "track_width": "error",
         "tracks_crossing": "error",
-        "tuning_profile_track_geometries": "ignore",
+        "tuning_profile_track_geometries": "warning",
         "unconnected_items": "error",
         "unresolved_variable": "error",
         "via_dangling": "warning",
@@ -251,7 +267,7 @@
       "internal_id": "",
       "mfg": "",
       "mpn": "",
-      "sch_revision": "B"
+      "sch_revision": "C"
     },
     "layer_pairs": [],
     "layer_presets": [],
@@ -528,29 +544,52 @@
       {
         "bus_width": 20,
         "line_style": 0,
-        "name": "Address Bus",
-        "pcb_color": "rgb(255, 0, 242)",
-        "priority": 2,
-        "schematic_color": "rgb(157, 105, 117)",
+        "name": "3v3 IO Bus",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 3,
+        "schematic_color": "rgb(0, 194, 194)",
         "tuning_profile": "",
         "wire_width": 8
       },
       {
         "bus_width": 20,
         "line_style": 0,
-        "name": "Data Bus",
+        "name": "Address Bus 5v",
+        "pcb_color": "rgb(255, 0, 242)",
+        "priority": 4,
+        "schematic_color": "rgb(128, 77, 0)",
+        "tuning_profile": "",
+        "wire_width": 8
+      },
+      {
+        "bus_width": 20,
+        "line_style": 0,
+        "name": "Data Bus 5v",
         "pcb_color": "rgb(20, 0, 255)",
-        "priority": 1,
+        "priority": 2,
         "schematic_color": "rgb(0, 0, 132)",
         "tuning_profile": "",
         "wire_width": 8
       },
       {
         "bus_width": 20,
+        "clearance": 0.2,
+        "diff_pair_width": 0.5,
+        "line_style": 0,
+        "name": "DifferentialPair",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 0,
+        "schematic_color": "rgb(255, 0, 255)",
+        "track_width": 0.5,
+        "tuning_profile": "",
+        "wire_width": 20
+      },
+      {
+        "bus_width": 20,
         "line_style": 0,
         "name": "GND",
         "pcb_color": "rgb(0, 255, 0)",
-        "priority": 3,
+        "priority": 5,
         "schematic_color": "rgb(0, 255, 0)",
         "track_width": 0.5,
         "tuning_profile": "",
@@ -561,7 +600,7 @@
         "line_style": 0,
         "name": "Power 1vX",
         "pcb_color": "rgb(230, 230, 105)",
-        "priority": 4,
+        "priority": 6,
         "schematic_color": "rgb(230, 230, 105)",
         "track_width": 0.5,
         "tuning_profile": "",
@@ -572,7 +611,7 @@
         "line_style": 0,
         "name": "Power 3v3",
         "pcb_color": "rgb(255, 165, 0)",
-        "priority": 5,
+        "priority": 7,
         "schematic_color": "rgb(255, 165, 0)",
         "track_width": 0.5,
         "tuning_profile": "",
@@ -583,7 +622,7 @@
         "line_style": 0,
         "name": "Power 5v0",
         "pcb_color": "rgb(255, 0, 0)",
-        "priority": 6,
+        "priority": 8,
         "schematic_color": "rgb(255, 0, 0)",
         "track_width": 0.5,
         "tuning_profile": "",
@@ -594,7 +633,7 @@
         "line_style": 0,
         "name": "SPI",
         "pcb_color": "rgb(255, 160, 188)",
-        "priority": 0,
+        "priority": 1,
         "schematic_color": "rgb(255, 160, 188)",
         "tuning_profile": "",
         "wire_width": 8
@@ -627,15 +666,15 @@
         "pattern": "/2350_QSPI.*"
       },
       {
-        "netclass": "Address Bus",
+        "netclass": "Address Bus 5v",
         "pattern": "/A\\d*"
       },
       {
-        "netclass": "Address Bus",
+        "netclass": "3v3 IO Bus",
         "pattern": "/3v3_A\\d*"
       },
       {
-        "netclass": "Data Bus",
+        "netclass": "3v3 IO Bus",
         "pattern": "/3v3_IO_\\d*"
       },
       {
@@ -647,8 +686,16 @@
         "pattern": "/2350_USB_D*"
       },
       {
-        "netclass": "Data Bus",
+        "netclass": "Data Bus 5v",
         "pattern": "/D\\d*"
+      },
+      {
+        "netclass": "DifferentialPair",
+        "pattern": "/*+"
+      },
+      {
+        "netclass": "DifferentialPair",
+        "pattern": "/*-"
       }
     ]
   },
@@ -701,8 +748,8 @@
         },
         {
           "group_by": false,
-          "label": "Datasheet",
-          "name": "Datasheet",
+          "label": "Description",
+          "name": "Description",
           "show": true
         },
         {
@@ -725,14 +772,14 @@
         },
         {
           "group_by": false,
-          "label": "#",
-          "name": "${ITEM_NUMBER}",
-          "show": false
+          "label": "Datasheet",
+          "name": "Datasheet",
+          "show": true
         },
         {
           "group_by": false,
-          "label": "Description",
-          "name": "Description",
+          "label": "#",
+          "name": "${ITEM_NUMBER}",
           "show": false
         },
         {
@@ -854,7 +901,7 @@
         "uuid": "26813dea-ac31-4359-98cd-29d1f4f9df4c"
       }
     ],
-    "used_designators": "",
+    "used_designators": "#PWR43,#PWR62-65,#PWR74,C30,J1-2,J6,R24-26,U18",
     "variants": []
   },
   "sheets": [
