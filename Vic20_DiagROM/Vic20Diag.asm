@@ -132,8 +132,8 @@ LF2AE                   := $F2AE
 .segment "HEADER"
 .word   BOOT_HARDWARE_INIT
 .word   BOOT_HARDWARE_INIT
-.byte   $41, $30        	; "A0"
-.byte   $C3, $C2, $CD   	; "CBM" (with high bits set)
+.byte   $41, $30        	                ; "A0"
+.byte   $C3, $C2, $CD   	                ; "CBM" (with high bits set)
 
 .segment "CODE"
 
@@ -198,7 +198,8 @@ LA054:  ; --- FLUSH SCREEN AND COLOR CHANNELS ---
 
         ; --- PHASE 2: BLIT DESCRIPTOR FROM TEXT MATRIX ---
         ldx     #$13                            ; Set counter for 19 characters ($13)
-LA069:  lda     LA19B,x                         ; Fetch text character from the target table boundary
+LA069:  
+        lda     STR_VC20_DIAGNOSTIC-1,x         ; Fetch text character from the target table boundary
         sta     $1EDD,x                         ; Blit text directly into screen memory area ($1EDD)
         dex                                     ; Decrement string array tracking index pointer
         bne     LA069                           ; Loop until text descriptor is fully rendered
@@ -403,10 +404,9 @@ LA175:  ; --- DIRECT SCREEN HARDWARE FAULT RENDERING ---
 LA193:  clc                                     ; Clear Carry flag before binary addition
         adc     #$01                            ; Increment accumulator value to cycle lines
         sta     $0100,y                         ; Pulse pattern into broken stack address to oscillate lines for probes
-
-LA19B           := * + 2                
         jmp     LA193
 
+STR_VC20_DIAGNOSTIC:
         .byte   $16,$03,$2D,$32,$30,$20,$20,$20
         .byte   $04,$09,$01,$07,$0E,$0F,$13,$14
         .byte   $09,$03,$20,$20,$16,$31,$2E,$32
@@ -473,8 +473,8 @@ TEST_PHASE_MANAGER:
         jsr     UTIL_RECYCLE_RESET              ; Reset core external parameters to passive baselines
         
         ; --- UI TEXT LAYER OUTPUT ---
-        ldx     #$5E                            ; Load low byte of the target registration string pointer address
-        ldy     #$A3                            ; Load high byte of target string array address
+        ldx     #<STR_RAM_TEST_PTR              ; Load low byte of the target registration string pointer address
+        ldy     #>STR_RAM_TEST_PTR              ; Load high byte of target string array address
         jsr     UTIL_PRINT_STRING               ; Print specific diagnostic block header descriptor string to console
         jsr     UTIL_PRINT_PASS_STATUS          ; Print standard success acknowledgment string on active row text cells
         
