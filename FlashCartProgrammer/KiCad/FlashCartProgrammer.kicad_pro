@@ -901,7 +901,7 @@
         "uuid": "26813dea-ac31-4359-98cd-29d1f4f9df4c"
       }
     ],
-    "used_designators": "#PWR43,#PWR62-65,#PWR74,C30,J1-2,J6,R24-26,U18",
+    "used_designators": "#PWR43,#PWR62-65,#PWR74,C30,J1-2,J6,R24-26,U9,U18,Power2",
     "variants": []
   },
   "sheets": [

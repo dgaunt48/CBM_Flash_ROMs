@@ -8285,342 +8285,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "SamacSys_Parts:DM3D-SF"
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "J"
-				(at -12.7 7.62 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-				)
-			)
-			(property "Value" "DM3D-SF"
-				(at -2.54 -7.62 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-				)
-			)
-			(property "Footprint" "SamacSys_Parts:DM3DSF"
-				(at 29.21 -94.92 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-				)
-			)
-			(property "Datasheet" "https://datasheet.datasheetarchive.com/originals/distributors/SFDatasheet-7/sf-000141252.pdf"
-				(at 29.21 -194.92 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-				)
-			)
-			(property "Description" "Micro SD card push pull manual"
-				(at 0 -35.56 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Height" "1.55"
-				(at 29.21 -394.92 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-				)
-			)
-			(property "Mouser Part Number" "798-DM3D-SF"
-				(at 29.21 -494.92 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-				)
-			)
-			(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Hirose-Connector/DM3D-SF?qs=nSryOFbzj8L3f0GFYlvXkw%3D%3D"
-				(at 29.21 -594.92 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-				)
-			)
-			(property "Manufacturer_Name" "Hirose"
-				(at 29.21 -694.92 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-				)
-			)
-			(property "Manufacturer_Part_Number" "DM3D-SF"
-				(at 29.21 -794.92 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-				)
-			)
-			(symbol "DM3D-SF_1_1"
-				(rectangle
-					(start -12.7 5.08)
-					(end 12.7 -22.86)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(pin passive line
-					(at 2.54 -27.94 90)
-					(length 5.08)
-					(name "GND"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "0"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at -17.78 -7.62 0)
-					(length 5.08)
-					(name "DAT2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at -17.78 -10.16 0)
-					(length 5.08)
-					(name "CD/DAT3"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at -17.78 -12.7 0)
-					(length 5.08)
-					(name "CMD"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "3"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 0 10.16 270)
-					(length 5.08)
-					(name "VDD"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "4"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at -17.78 -15.24 0)
-					(length 5.08)
-					(name "CLK"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "5"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at -2.54 -27.94 90)
-					(length 5.08)
-					(name "VSS"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "6"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at -17.78 -2.54 0)
-					(length 5.08)
-					(name "DAT0"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "7"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at -17.78 -5.08 0)
-					(length 5.08)
-					(name "DAT1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "8"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 17.78 -7.62 180)
-					(length 5.08)
-					(name "SW_A"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "A"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 17.78 -10.16 180)
-					(length 5.08)
-					(name "SW_B"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "B"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "_Custom:DE15_Socket_HighDensity_MountingHoles"
 			(pin_names
 				(offset 1.016)
@@ -9227,6 +8891,342 @@
 						)
 					)
 					(number "SH"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "_Custom:DM3D-SF_SDCard"
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "J"
+				(at -12.7 7.62 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Value" "DM3D-SF_SDCard"
+				(at -2.54 -7.62 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Footprint" "_Custom:DM3DSF_SDCard"
+				(at 29.21 -94.92 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Datasheet" "https://datasheet.datasheetarchive.com/originals/distributors/SFDatasheet-7/sf-000141252.pdf"
+				(at 29.21 -194.92 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Description" "Micro SD card push pull manual"
+				(at 0 -35.56 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Height" "1.55"
+				(at 29.21 -394.92 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Mouser Part Number" "798-DM3D-SF"
+				(at 29.21 -494.92 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Hirose-Connector/DM3D-SF?qs=nSryOFbzj8L3f0GFYlvXkw%3D%3D"
+				(at 29.21 -594.92 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Manufacturer_Name" "Hirose"
+				(at 29.21 -694.92 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Manufacturer_Part_Number" "DM3D-SF"
+				(at 29.21 -794.92 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(symbol "DM3D-SF_SDCard_1_1"
+				(rectangle
+					(start -12.7 5.08)
+					(end 12.7 -22.86)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(pin passive line
+					(at 2.54 -27.94 90)
+					(length 5.08)
+					(name "GND"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "0"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -17.78 -7.62 0)
+					(length 5.08)
+					(name "DAT2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -17.78 -10.16 0)
+					(length 5.08)
+					(name "CD/DAT3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -17.78 -12.7 0)
+					(length 5.08)
+					(name "CMD"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 10.16 270)
+					(length 5.08)
+					(name "VDD"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -17.78 -15.24 0)
+					(length 5.08)
+					(name "CLK"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -2.54 -27.94 90)
+					(length 5.08)
+					(name "VSS"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "6"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -17.78 -2.54 0)
+					(length 5.08)
+					(name "DAT0"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "7"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -17.78 -5.08 0)
+					(length 5.08)
+					(name "DAT1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "8"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 17.78 -7.62 180)
+					(length 5.08)
+					(name "SW_A"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "A"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 17.78 -10.16 180)
+					(length 5.08)
+					(name "SW_B"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "B"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -11982,12 +11982,6 @@
 		(uuid "41ff9fc0-7ffe-4ff3-8731-b4f6775b1499")
 	)
 	(junction
-		(at 81.28 137.16)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "421f323f-2d74-486f-9108-ed2b44807113")
-	)
-	(junction
 		(at 424.18 35.56)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -11998,6 +11992,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "49a8a8cb-4d72-4a9a-bc0e-24a4aed3a4cf")
+	)
+	(junction
+		(at 76.2 137.16)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "49e5b1ff-721a-40ab-b7f6-ca137c751a50")
 	)
 	(junction
 		(at 109.22 60.96)
@@ -12168,12 +12168,6 @@
 		(uuid "8f15d5ef-9e42-4fe6-90b3-334094be4396")
 	)
 	(junction
-		(at 91.44 137.16)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "8fd8e661-7280-4492-bf22-47a6e9805b4a")
-	)
-	(junction
 		(at 530.86 73.66)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -12268,6 +12262,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "ca2fe0e0-e857-4da6-81e4-f99817bad014")
+	)
+	(junction
+		(at 91.44 137.16)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "cdb4fb8b-0296-45a2-87ce-b87d7562e749")
 	)
 	(junction
 		(at 398.78 175.26)
@@ -15455,7 +15455,7 @@
 	)
 	(wire
 		(pts
-			(xy 81.28 137.16) (xy 83.82 137.16)
+			(xy 76.2 137.16) (xy 81.28 137.16)
 		)
 		(stroke
 			(width 0)
@@ -16485,7 +16485,7 @@
 	)
 	(wire
 		(pts
-			(xy 81.28 132.08) (xy 81.28 137.16)
+			(xy 76.2 132.08) (xy 76.2 137.16)
 		)
 		(stroke
 			(width 0)
@@ -16865,7 +16865,7 @@
 	)
 	(wire
 		(pts
-			(xy 81.28 137.16) (xy 81.28 139.7)
+			(xy 76.2 137.16) (xy 76.2 139.7)
 		)
 		(stroke
 			(width 0)
@@ -20255,7 +20255,7 @@
 	)
 	(wire
 		(pts
-			(xy 86.36 139.7) (xy 86.36 147.32)
+			(xy 83.82 139.7) (xy 83.82 147.32)
 		)
 		(stroke
 			(width 0)
@@ -20785,7 +20785,7 @@
 	)
 	(wire
 		(pts
-			(xy 81.28 144.78) (xy 81.28 147.32)
+			(xy 76.2 144.78) (xy 76.2 147.32)
 		)
 		(stroke
 			(width 0)
@@ -21405,7 +21405,7 @@
 	)
 	(wire
 		(pts
-			(xy 88.9 137.16) (xy 91.44 137.16)
+			(xy 86.36 137.16) (xy 91.44 137.16)
 		)
 		(stroke
 			(width 0)
@@ -21705,7 +21705,7 @@
 	)
 	(wire
 		(pts
-			(xy 81.28 132.08) (xy 116.84 132.08)
+			(xy 76.2 132.08) (xy 116.84 132.08)
 		)
 		(stroke
 			(width 0)
@@ -25039,7 +25039,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 502.92 68.58 0)
 			(hide yes)
 			(show_name no)
@@ -25716,7 +25716,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 213.36 38.1 0)
 			(hide yes)
 			(show_name no)
@@ -26937,7 +26937,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 172.72 38.1 0)
 			(hide yes)
 			(show_name no)
@@ -28154,7 +28154,7 @@
 	)
 	(symbol
 		(lib_id "Device:C_Small")
-		(at 81.28 142.24 180)
+		(at 76.2 142.24 180)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -28164,6 +28164,16 @@
 		(dnp no)
 		(uuid "3118dd76-f8fb-4c59-b5ab-172f28f56a45")
 		(property "Reference" "C22"
+			(at 73.66 142.24 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "10pf"
 			(at 78.74 142.24 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28173,18 +28183,8 @@
 				)
 			)
 		)
-		(property "Value" "12pf"
-			(at 83.82 142.24 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
-			(at 81.28 142.24 0)
+			(at 76.2 142.24 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28195,7 +28195,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 81.28 142.24 0)
+			(at 76.2 142.24 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28206,7 +28206,7 @@
 			)
 		)
 		(property "Description" "Unpolarized capacitor, small symbol"
-			(at 81.28 142.24 0)
+			(at 76.2 142.24 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29384,7 +29384,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 546.1 68.58 0)
 			(hide yes)
 			(show_name no)
@@ -29541,7 +29541,7 @@
 				)
 			)
 		)
-		(property "Value" "1k"
+		(property "Value" "2k2"
 			(at 58.42 91.44 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29754,7 +29754,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 86.36 147.32 0)
+		(at 83.82 147.32 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -29765,7 +29765,7 @@
 		(fields_autoplaced yes)
 		(uuid "597384d0-b5a7-44d6-b77d-cb3ea17a9836")
 		(property "Reference" "#PWR040"
-			(at 86.36 153.67 0)
+			(at 83.82 153.67 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29776,7 +29776,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 86.3599 151.13 90)
+			(at 83.8199 151.13 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29788,7 +29788,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 86.36 147.32 0)
+			(at 83.82 147.32 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29799,7 +29799,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 86.36 147.32 0)
+			(at 83.82 147.32 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29810,7 +29810,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 86.36 147.32 0)
+			(at 83.82 147.32 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -30737,7 +30737,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 193.04 38.1 0)
 			(hide yes)
 			(show_name no)
@@ -31115,7 +31115,7 @@
 		)
 	)
 	(symbol
-		(lib_id "SamacSys_Parts:DM3D-SF")
+		(lib_id "_Custom:DM3D-SF_SDCard")
 		(at 325.12 139.7 0)
 		(unit 1)
 		(body_style 1)
@@ -31147,7 +31147,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SamacSys_Parts:DM3DSF"
+		(property "Footprint" "_Custom:DM3DSF_SDCard"
 			(at 354.33 234.62 0)
 			(hide yes)
 			(show_name no)
@@ -31172,7 +31172,7 @@
 			)
 		)
 		(property "Description" "Micro SD card push pull manual"
-			(at 325.12 139.7 0)
+			(at 325.12 175.26 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -31883,7 +31883,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 180.34 63.5 0)
 			(hide yes)
 			(show_name no)
@@ -32640,7 +32640,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 119.38 55.88 0)
 			(hide yes)
 			(show_name no)
@@ -33532,7 +33532,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 109.22 55.88 0)
 			(hide yes)
 			(show_name no)
@@ -34422,7 +34422,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 182.88 38.1 0)
 			(hide yes)
 			(show_name no)
@@ -35315,7 +35315,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 99.06 78.74 0)
 			(hide yes)
 			(show_name no)
@@ -35383,7 +35383,7 @@
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "a7aac160-a49c-44b7-9153-62771d69f21c")
 		(property "Reference" "C19"
 			(at 27.94 83.82 90)
@@ -35736,7 +35736,7 @@
 				)
 			)
 		)
-		(property "Value" "12pf"
+		(property "Value" "10pf"
 			(at 93.98 142.24 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35883,7 +35883,7 @@
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "b28e5410-b9b1-4c25-8c5a-b536f5a3b03a")
 		(property "Reference" "U3"
 			(at 31.8632 97.3017 0)
@@ -35908,7 +35908,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Dave Footprints:SOIC-8_5.23x5.23mm_P1.27mm"
+		(property "Footprint" "Package_SO:SOIC-8_5.3x5.3mm_P1.27mm"
 			(at 34.798 138.43 0)
 			(hide yes)
 			(show_name no)
@@ -36121,7 +36121,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 81.28 147.32 0)
+		(at 76.2 147.32 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -36132,7 +36132,7 @@
 		(fields_autoplaced yes)
 		(uuid "b9113025-9b68-42bc-b2bd-9a028675dbf2")
 		(property "Reference" "#PWR039"
-			(at 81.28 153.67 0)
+			(at 76.2 153.67 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36143,7 +36143,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 81.2799 151.13 90)
+			(at 76.1999 151.13 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36155,7 +36155,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 81.28 147.32 0)
+			(at 76.2 147.32 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36166,7 +36166,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 81.28 147.32 0)
+			(at 76.2 147.32 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36177,7 +36177,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 81.28 147.32 0)
+			(at 76.2 147.32 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36631,7 +36631,7 @@
 	)
 	(symbol
 		(lib_id "Device:Crystal_GND24_Small")
-		(at 86.36 137.16 0)
+		(at 83.82 137.16 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -36641,7 +36641,7 @@
 		(dnp no)
 		(uuid "cf67ff1c-0d22-4419-90bf-5a71848e0bff")
 		(property "Reference" "Y1"
-			(at 83.82 139.7 90)
+			(at 81.28 139.7 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36652,7 +36652,7 @@
 			)
 		)
 		(property "Value" "12MHz"
-			(at 91.44 134.62 0)
+			(at 84.0989 133.9263 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -36662,7 +36662,7 @@
 			)
 		)
 		(property "Footprint" "Crystal:Crystal_SMD_SeikoEpson_FA238V-4Pin_3.2x2.5mm"
-			(at 86.36 137.16 0)
+			(at 83.82 137.16 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36673,7 +36673,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 86.36 137.16 0)
+			(at 83.82 137.16 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36684,7 +36684,7 @@
 			)
 		)
 		(property "Description" "Four pin crystal, GND on pins 2 and 4, small symbol"
-			(at 86.36 137.16 0)
+			(at 83.82 137.16 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36695,7 +36695,7 @@
 			)
 		)
 		(property "Note" ""
-			(at 86.36 137.16 0)
+			(at 83.82 137.16 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36706,7 +36706,7 @@
 			)
 		)
 		(property "Voltage" ""
-			(at 86.36 137.16 0)
+			(at 83.82 137.16 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36717,7 +36717,7 @@
 			)
 		)
 		(property "class" ""
-			(at 86.36 137.16 0)
+			(at 83.82 137.16 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37595,7 +37595,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 132.08 55.88 0)
 			(hide yes)
 			(show_name no)
@@ -37791,7 +37791,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 99.06 55.88 0)
 			(hide yes)
 			(show_name no)
@@ -37859,7 +37859,7 @@
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "da758d7a-7460-4fe5-8dc1-8ded20e830d9")
 		(property "Reference" "R11"
 			(at 52.7234 83.858 90)
@@ -38018,7 +38018,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 203.2 38.1 0)
 			(hide yes)
 			(show_name no)
@@ -39505,7 +39505,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "SamacSys_Parts:LEDC2012X90N"
+		(property "Footprint" "LED_SMD:LED_0805_2012Metric"
 			(at 431.8 53.34 0)
 			(hide yes)
 			(show_name no)
@@ -39809,7 +39809,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 162.56 38.1 0)
 			(hide yes)
 			(show_name no)
@@ -39923,7 +39923,7 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Unpolarized capacitor, small symbol"
 			(at 152.4 38.1 0)
 			(hide yes)
 			(show_name no)
@@ -40366,7 +40366,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "RP2350B-QFN80"
+		(property "Value" "RP2354B-QFN80"
 			(at 144.78 142.24 0)
 			(show_name no)
 			(do_not_autoplace no)
