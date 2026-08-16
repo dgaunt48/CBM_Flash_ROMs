@@ -13,14 +13,19 @@
 #include "SpiNorFlash.h"
 #include "iCE40_BitStream.h"
 
-#define SPI_BAUD_RATE	(5 * 1000 * 1000)	/* 5Mhz */
+#define SPI_BAUD_RATE	(10 * 1000 * 1000)	/* 10Mhz */
 #define VGA_PAL_CLOCK	(25000000)
 
 enum board_pins{
-	PIN_RED = 0, PIN_GREEN, PIN_BLUE, PIN_FPGA_RESET,
-	PIN_SPI_MOSI, PIN_SPI_CS, PIN_SPI_CLOCK, PIN_SPI_MISO,
-	PIN_HSYNC, PIN_VSYNC, PIN_FPGA_DONE,
-	PIN_25MHZ_CLOCK = 21
+	PIN_RED = 0, PIN_GREEN, PIN_BLUE,
+	PIN_HSYNC = 8, PIN_VSYNC,
+	PIN_SPI_CS = 17,
+	PIN_SPI_CLOCK,
+	PIN_SPI_MOSI,
+	PIN_SPI_MISO,
+	PIN_25MHZ_CLOCK,
+	PIN_FPGA_DONE,
+	PIN_FPGA_RESET = 41
 };
 
 static_assert(21 == PIN_25MHZ_CLOCK, "Pico only exposes PIN_21 for external clocks!");
@@ -36,6 +41,7 @@ int main()
     gpio_init(PIN_FPGA_RESET);
     gpio_set_dir(PIN_FPGA_RESET, GPIO_OUT);
     gpio_put(PIN_FPGA_RESET, false);
+	sleep_ms(10);
 
 	vga_Init(PIN_RED, PIN_HSYNC, PIN_VSYNC);
 	vga_FilledRect(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB111_GREEN);
@@ -77,16 +83,16 @@ int main()
 	{
 		vga_DrawString(4, 4, "Can't Communicate With Flash ROM!!!", RGB111_RED);
 	}
+
+	// Start Clock
+	clock_gpio_init(PIN_25MHZ_CLOCK, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_CLK_SYS, ((float)SYS_CLK_HZ / (float)VGA_PAL_CLOCK));
+	sleep_ms(10);
 	
 	// Change SS to input mode to allow FPGA to drive it
     gpio_set_dir(PIN_SPI_CS, GPIO_IN);
 
 	// Release FPGA from RESET state
     gpio_put(PIN_FPGA_RESET, true);
-
-	// Start Clock
-	clock_gpio_init(PIN_25MHZ_CLOCK, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_CLK_SYS, ((float)SYS_CLK_HZ / (float)VGA_PAL_CLOCK));
-	sleep_ms(1000);
 
 	while(true)
 	{
