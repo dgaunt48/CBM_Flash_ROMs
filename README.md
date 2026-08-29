@@ -14,7 +14,7 @@ Flash cartridge for the C64
 ## FlashCartProgrammer
 Flash Cart Programmer with sockets for VIC20 & C64 cartridges plus pin header for programming
 of my 16Bit Flash ROM Adaptor board.
-[link to ibom](ibom_FlashCartProgrammer.html)
+[link to ibom](FlashCartProgrammer/ibom.html)
 
 ## FlashSPI
 Raspberry PI Pico code used to program the SPI Flash ROM on my FPGA boards.

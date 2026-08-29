@@ -10,6 +10,7 @@
 		(rev "C")
 		(comment 1 "Fixed the patch wires required on Rev B")
 		(comment 2 "Added reset pin to ZIF Header.")
+		(comment 3 "Added A19 to both C64 and VIC Headers.")
 	)
 	(lib_symbols
 		(symbol "74LS573_1"
@@ -7880,105 +7881,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "Mechanical:MountingHole"
-			(pin_names
-				(offset 1.016)
-			)
-			(exclude_from_sim no)
-			(in_bom no)
-			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "H"
-				(at 0 5.08 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "MountingHole"
-				(at 0 3.175 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" ""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Datasheet" ""
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Description" "Mounting Hole without connection"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_keywords" "mounting hole"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_fp_filters" "MountingHole*"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(symbol "MountingHole_0_1"
-				(circle
-					(center 0 0)
-					(radius 1.27)
-					(stroke
-						(width 1.27)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "PWR_FLAG_1"
 			(power global)
 			(pin_numbers
@@ -12468,16 +12370,8 @@
 		(uuid "3678fa63-8de9-4998-877d-0dc6b146b2dc")
 	)
 	(no_connect
-		(at 383.54 243.84)
-		(uuid "3b6553ff-a46e-468b-997e-1d7f17a645a6")
-	)
-	(no_connect
 		(at 454.66 297.18)
 		(uuid "3c2b5fbb-a772-4388-b180-d7e7a0d39c77")
-	)
-	(no_connect
-		(at 383.54 274.32)
-		(uuid "42165da8-4285-4bcc-a6b7-d1f6290c01ac")
 	)
 	(no_connect
 		(at 454.66 287.02)
@@ -13587,6 +13481,15 @@
 		(uuid "982d6cd6-6960-43d3-8a99-3dcc116e8a91")
 	)
 	(bus_entry
+		(at 398.78 243.84)
+		(size 2.54 -2.54)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9ababdeb-37ce-49ec-90d5-efdf1c8e4bb8")
+	)
+	(bus_entry
 		(at 218.44 139.7)
 		(size -2.54 -2.54)
 		(stroke
@@ -13657,6 +13560,15 @@
 			(type default)
 		)
 		(uuid "a3a2d64f-7ca0-4171-a0e2-5a5a5f257411")
+	)
+	(bus_entry
+		(at 398.78 274.32)
+		(size 2.54 2.54)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a3fbb163-d61c-4e2f-b3b1-7af0e03c0984")
 	)
 	(bus_entry
 		(at 398.78 284.48)
@@ -15695,6 +15607,16 @@
 	)
 	(wire
 		(pts
+			(xy 398.78 243.84) (xy 383.54 243.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2a7f3e3c-16fb-45ea-888f-ce04ff4a5c9d")
+	)
+	(wire
+		(pts
 			(xy 50.8 78.74) (xy 50.8 81.28)
 		)
 		(stroke
@@ -16195,7 +16117,7 @@
 	)
 	(wire
 		(pts
-			(xy 383.54 269.24) (xy 388.62 269.24)
+			(xy 383.54 269.24) (xy 386.08 269.24)
 		)
 		(stroke
 			(width 0)
@@ -16215,7 +16137,7 @@
 	)
 	(wire
 		(pts
-			(xy 383.54 271.78) (xy 388.62 271.78)
+			(xy 383.54 271.78) (xy 386.08 271.78)
 		)
 		(stroke
 			(width 0)
@@ -19315,6 +19237,16 @@
 	)
 	(bus
 		(pts
+			(xy 401.32 238.76) (xy 401.32 279.4)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9f4da809-8231-4af9-b810-c5dabe1b8096")
+	)
+	(bus
+		(pts
 			(xy 218.44 139.7) (xy 218.44 142.24)
 		)
 		(stroke
@@ -19695,7 +19627,7 @@
 	)
 	(wire
 		(pts
-			(xy 383.54 248.92) (xy 388.62 248.92)
+			(xy 383.54 248.92) (xy 386.08 248.92)
 		)
 		(stroke
 			(width 0)
@@ -20283,16 +20215,6 @@
 		)
 		(uuid "bcad2fd8-4614-48f3-bbae-3ec162764167")
 	)
-	(bus
-		(pts
-			(xy 401.32 238.76) (xy 401.32 279.4)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "bcb46018-36ee-42e0-a21e-83baf48394b1")
-	)
 	(wire
 		(pts
 			(xy 495.3 274.32) (xy 495.3 276.86)
@@ -20342,6 +20264,16 @@
 			(type default)
 		)
 		(uuid "bd7b177b-1026-49e2-a77b-3a2b80a0cbfc")
+	)
+	(wire
+		(pts
+			(xy 383.54 274.32) (xy 398.78 274.32)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "be480a0d-87d6-410a-9155-52d7eb11563c")
 	)
 	(wire
 		(pts
@@ -20765,7 +20697,7 @@
 	)
 	(wire
 		(pts
-			(xy 383.54 246.38) (xy 388.62 246.38)
+			(xy 383.54 246.38) (xy 386.08 246.38)
 		)
 		(stroke
 			(width 0)
@@ -22603,6 +22535,16 @@
 		)
 		(uuid "275c9fea-baaa-4ef2-ae28-09ceed2ee97d")
 	)
+	(label "A19"
+		(at 396.24 243.84 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "2ab98763-c508-4558-813b-413eaf7aa4d1")
+	)
 	(label "D13"
 		(at 490.22 302.26 0)
 		(effects
@@ -23543,6 +23485,16 @@
 		)
 		(uuid "8da0de89-360d-4ccd-a1d8-195296a152c4")
 	)
+	(label "A19"
+		(at 396.24 274.32 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "8df53fc9-b514-43e6-8dcb-4d1fcc6a3b47")
+	)
 	(label "2350_USB_D-"
 		(at 218.44 81.28 180)
 		(effects
@@ -24429,7 +24381,7 @@
 	)
 	(global_label "~{OE}"
 		(shape input)
-		(at 388.62 248.92 0)
+		(at 386.08 248.92 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24439,7 +24391,7 @@
 		)
 		(uuid "227e564c-cea1-44c7-bb98-a70eb08b16a1")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 394.0847 248.92 0)
+			(at 391.5447 248.92 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24621,7 +24573,7 @@
 	)
 	(global_label "~{WE}"
 		(shape input)
-		(at 388.62 271.78 0)
+		(at 386.08 271.78 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24631,7 +24583,7 @@
 		)
 		(uuid "67047684-3094-441c-b092-4933d8e544c4")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 394.2056 271.78 0)
+			(at 391.6656 271.78 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24645,7 +24597,7 @@
 	)
 	(global_label "~{WE}"
 		(shape input)
-		(at 388.62 246.38 0)
+		(at 386.08 246.38 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24655,7 +24607,7 @@
 		)
 		(uuid "6929c32a-ad86-46b0-8abd-d911b6db26ce")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 394.2056 246.38 0)
+			(at 391.6656 246.38 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24861,7 +24813,7 @@
 	)
 	(global_label "~{OE}"
 		(shape input)
-		(at 388.62 269.24 0)
+		(at 386.08 269.24 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24871,7 +24823,7 @@
 		)
 		(uuid "f4048eaf-f618-4653-983a-aebb35e5e7c5")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 394.0847 269.24 0)
+			(at 391.5447 269.24 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28726,7 +28678,7 @@
 				)
 			)
 		)
-		(property "Value" "ZIF Header"
+		(property "Value" "ZIF"
 			(at 376.949 164.9593 90)
 			(hide yes)
 			(show_name no)
@@ -32468,7 +32420,7 @@
 				)
 			)
 		)
-		(property "Value" "Vic20 Header"
+		(property "Value" "Vic20"
 			(at 376.949 236.0793 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -33159,81 +33111,6 @@
 			(project "FlashCartProgrammer"
 				(path "/26813dea-ac31-4359-98cd-29d1f4f9df4c"
 					(reference "R3")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Mechanical:MountingHole")
-		(at 444.5 398.78 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom no)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "8e260f4b-1d95-4b12-8196-760d499413c1")
-		(property "Reference" "H2"
-			(at 447.04 397.5099 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "MountingHole_Pad"
-			(at 447.04 400.0499 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "MountingHole:MountingHole_3.5mm"
-			(at 444.5 398.78 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 444.5 398.78 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Mounting Hole without connection"
-			(at 444.5 398.78 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(instances
-			(project "FlashCartProgrammer"
-				(path "/26813dea-ac31-4359-98cd-29d1f4f9df4c"
-					(reference "H2")
 					(unit 1)
 				)
 			)
@@ -35072,7 +34949,7 @@
 				)
 			)
 		)
-		(property "Value" "C64 Header"
+		(property "Value" "C64"
 			(at 375.92 279.4 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35438,9 +35315,8 @@
 				)
 			)
 		)
-		(property "Note" ""
+		(property "Note" "DNP"
 			(at 27.94 88.9 0)
-			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -35941,9 +35817,8 @@
 				)
 			)
 		)
-		(property "Note" ""
+		(property "Note" "DNP"
 			(at 35.56 109.22 0)
-			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -37914,9 +37789,8 @@
 				)
 			)
 		)
-		(property "Note" ""
+		(property "Note" "DNP"
 			(at 50.8 83.82 0)
-			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -39977,81 +39851,6 @@
 			(project "FlashCartProgrammer"
 				(path "/26813dea-ac31-4359-98cd-29d1f4f9df4c"
 					(reference "C7")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Mechanical:MountingHole")
-		(at 444.5 393.7 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom no)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "f5f173f3-6f52-493b-b100-11548c51cddd")
-		(property "Reference" "H1"
-			(at 447.04 392.4299 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "MountingHole_Pad"
-			(at 447.04 394.9699 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "MountingHole:MountingHole_3.5mm"
-			(at 444.5 393.7 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 444.5 393.7 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Mounting Hole without connection"
-			(at 444.5 393.7 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(instances
-			(project "FlashCartProgrammer"
-				(path "/26813dea-ac31-4359-98cd-29d1f4f9df4c"
-					(reference "H1")
 					(unit 1)
 				)
 			)
